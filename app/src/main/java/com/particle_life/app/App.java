@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class App {
@@ -40,7 +41,11 @@ public class App {
 
         while (!glfwWindowShouldClose(window)) {
             // use this to wait for events instead of polling, saving CPU
-            glfwWaitEvents();
+            glfwPollEvents();
+
+            draw();
+
+            glfwSwapBuffers(window); // swap the color buffers
         }
 
         // Free the window callbacks and destroy the window
@@ -150,5 +155,19 @@ public class App {
             height = windowHeight;
             glfwSetWindowMonitor(window, NULL, windowPosX, windowPosY, width, height, GLFW_DONT_CARE);
         }
+    }
+
+    private void draw() {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT); // clear the framebuffer
+        render();
+    }
+
+    private void render() {
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glPointSize(50.0f);
+        glBegin(GL_POINTS);
+        glVertex2f(0.0f, 0.0f);
+        glEnd();
     }
 }
