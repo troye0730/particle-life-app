@@ -1,18 +1,33 @@
 package com.particle_life.app;
 
+import com.particle_life.app.shaders.*;
+import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 
+import java.io.IOException;
+import java.util.Random;
+
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class App {
+
+    private static String LWJGL_VERSION;
+    private static String OPENGL_VENDOR;
+    private static String OPENGL_RENDERER;
+    private static String OPENGL_VERSION;
+    private static String GLSL_VERSION;
+
     public static void main(String[] args) {
         App app = new App();
         app.launch("Particle Life Simulator",
-            false
+            false,
+            // request OpenGL version 4.1 (corresponds to "#version 410" in shaders)
+            4, 1
         );
     }
 
@@ -27,8 +42,19 @@ public class App {
     private int windowWidth = -1;
     private int windowHeight = -1;
 
-    private void launch(String title, boolean fullscreen) {
-        init(title, fullscreen);
+    // data
+    private int particleNums = 1;
+    private float particleSize = 0.15f;
+    private double[] positions = new double[particleNums * 3];
+    private static final Random random = new Random();
+
+    // helper class
+    private final ParticleRenderer particleRenderer = new ParticleRenderer();
+    private ParticleShader particleShader;
+
+    private void launch(String title, boolean fullscreen,
+                        int glContextVersionMajor, int glContextVersionMinor) {
+        init(title, fullscreen, glContextVersionMajor, glContextVersionMinor);
 
         // This line is critical for LWJGL's interoperation with GLFW's
         // OpenGL context, or any context that is managed externally.
@@ -38,6 +64,8 @@ public class App {
         GL.createCapabilities();
 
         setCallbacks();
+
+        setup();
 
         while (!glfwWindowShouldClose(window)) {
             // use this to wait for events instead of polling, saving CPU
@@ -56,7 +84,8 @@ public class App {
         glfwTerminate();
     }
 
-    private void init(String title, boolean fullscreen) {
+    private void init(String title, boolean fullscreen,
+                      int glContextVersionMajor, int glContextVersionMinor) {
         // Initialize GLFW. Most GLFW functions will not work before doing this.
         if (!glfwInit()) {
             throw new IllegalStateException("Unable to initialize GLFW");
@@ -66,6 +95,10 @@ public class App {
         glfwDefaultWindowHints(); // optional, the current window hints are already the default
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
+
+        // request OpenGL version
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, glContextVersionMajor);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, glContextVersionMinor);
 
         // Create the window
         long monitor = glfwGetPrimaryMonitor();
@@ -78,7 +111,7 @@ public class App {
 
         // Set window size and position
         double f = 0.2;
-        windowPosX = (int) (f * monitorWidth / 2);;
+        windowPosX = (int) (f * monitorWidth / 2);
         windowPosY = (int) (f * monitorHeight / 2);
         windowWidth = (int) ((1 - f) * monitorWidth);
         windowHeight = (int) ((1 - f) * monitorHeight);
@@ -117,6 +150,45 @@ public class App {
                 glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop
             }
         });
+
+        glfwSetFramebufferSizeCallback(window, (w, fbw, fbh) -> {
+            width = fbw;
+            height = fbh;
+            glViewport(0, 0, fbw, fbh);
+        });
+    }
+
+    private void setup() {
+        LWJGL_VERSION = Version.getVersion();
+        OPENGL_VENDOR = glGetString(GL_VENDOR);
+        OPENGL_RENDERER = glGetString(GL_RENDERER);
+        OPENGL_VERSION = glGetString(GL_VERSION);
+        GLSL_VERSION = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+        System.out.println("LWJGL Version: " + LWJGL_VERSION);
+        System.out.println("OpenGL Vendor: " + OPENGL_VENDOR);
+        System.out.println("OpenGL Renderer: " + OPENGL_RENDERER);
+        System.out.println("OpenGL Version: " + OPENGL_VERSION);
+        System.out.println("GLSL Version: " + GLSL_VERSION);
+
+        particleRenderer.init();
+
+        try {
+            particleShader = new ParticleShader("src/main/resources/shaders/default.vert",
+                                    "src/main/resources/shaders/default.geom",
+                                    "src/main/resources/shaders/default.frag");
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        float scale = 0.3f;
+        for (int i = 0; i < particleNums; i++) {
+            final int i3 = i * 3;
+            positions[i3] = 0.0;
+            positions[i3 + 1] = 0.0;
+            positions[i3 + 2] = 0.0;
+        }
     }
 
     private boolean isFullscreen() {
@@ -158,16 +230,18 @@ public class App {
     }
 
     private void draw() {
+        // clear the framebuffer
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT); // clear the framebuffer
+        glClear(GL_COLOR_BUFFER_BIT);
+
         render();
     }
 
     private void render() {
-        glColor3f(1.0f, 1.0f, 1.0f);
-        glPointSize(50.0f);
-        glBegin(GL_POINTS);
-        glVertex2f(0.0f, 0.0f);
-        glEnd();
+        particleRenderer.bufferParticleData(particleShader, positions);
+        particleShader.use();
+        particleShader.setSize(particleSize);
+        particleShader.setAspect((float) width / (float) height);
+        particleRenderer.drawParticles();
     }
 }
