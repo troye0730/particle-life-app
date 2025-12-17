@@ -141,6 +141,11 @@ public class App {
     }
 
     private void setCallbacks() {
+        glfwSetWindowSizeCallback(window, (window1, newWidth, newHeight) -> {
+            width = newWidth;
+            height = newHeight;
+        });
+
         // Set a key callback. It will be called every time a key is pressed, repeated or released.
         glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
             if (key == GLFW_KEY_F && action == GLFW_PRESS) {
@@ -149,12 +154,6 @@ public class App {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop
             }
-        });
-
-        glfwSetFramebufferSizeCallback(window, (w, fbw, fbh) -> {
-            width = fbw;
-            height = fbh;
-            glViewport(0, 0, fbw, fbh);
         });
     }
 
@@ -185,8 +184,8 @@ public class App {
         float scale = 0.3f;
         for (int i = 0; i < particleNums; i++) {
             final int i3 = i * 3;
-            positions[i3] = 0.0;
-            positions[i3 + 1] = 0.0;
+            positions[i3] = 1.0;
+            positions[i3 + 1] = 1.0;
             positions[i3 + 2] = 0.0;
         }
     }

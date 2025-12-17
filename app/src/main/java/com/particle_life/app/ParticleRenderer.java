@@ -33,8 +33,8 @@ class ParticleRenderer {
 
         // detect change
         boolean shaderChanged = particleShader.shaderProgram != lastShaderProgram;
-        boolean bufferSizeChanged = x.length != lastBufferedSize;
-        lastBufferedSize = x.length;
+        boolean bufferSizeChanged = x.length != lastBufferedSize * 3;
+        lastBufferedSize = x.length / 3;
         lastShaderProgram = particleShader.shaderProgram;
 
         if (shaderChanged) {
