@@ -15,6 +15,9 @@ repositories {
 }
 
 dependencies {
+    // Linear Algebra Library "JOML"
+    implementation 'org.joml:joml:1.10.1'
+    
     // Lightweight Java Game Library "LWJGL" (code from https://www.lwjgl.org/customize)
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
     implementation "org.lwjgl:lwjgl"

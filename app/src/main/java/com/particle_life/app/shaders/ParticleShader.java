@@ -1,5 +1,7 @@
 package com.particle_life.app.shaders;
 
+import org.joml.Matrix4d;
+
 import java.io.IOException;
 
 import static org.lwjgl.opengl.GL20C.*;
@@ -7,8 +9,9 @@ import static org.lwjgl.opengl.GL20C.*;
 public class ParticleShader {
     public final int shaderProgram;
 
+    private final int transformUniformLocation;
+    private final int camTopLeftUniformLocation;
     private final int sizeUniformLocation;
-    private final int aspectUniformLocation;
 
     public final int xAttribLocation;
 
@@ -21,8 +24,9 @@ public class ParticleShader {
         shaderProgram = ShaderUtil.makeShaderProgram(vertexShaderSource, geometryShaderResource, fragmentShaderResource);
 
         // GET LOCATIONS
+        transformUniformLocation = glGetUniformLocation(shaderProgram, "transform");
+        camTopLeftUniformLocation = glGetUniformLocation(shaderProgram, "camTopLeft");
         sizeUniformLocation = glGetUniformLocation(shaderProgram, "size");
-        aspectUniformLocation = glGetUniformLocation(shaderProgram, "aspect");
 
         xAttribLocation = glGetAttribLocation(shaderProgram, "x");
     }
@@ -38,7 +42,11 @@ public class ParticleShader {
         glUniform1f(sizeUniformLocation, size);
     }
 
-    public void setAspect(float aspect) {
-        glUniform1f(aspectUniformLocation, aspect);
+    public void setTransform(Matrix4d transform) {
+        glUniformMatrix4fv(transformUniformLocation, false, transform.get(this.transform));
+    }
+
+    public void setCamTopLeft(float camLeft, float camTop) {
+        glUniform2f(camTopLeftUniformLocation, camLeft, camTop);
     }
 }

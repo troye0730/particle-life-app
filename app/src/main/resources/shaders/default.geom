@@ -1,8 +1,9 @@
 #version 410
 #pragma optimize(on)
 
+uniform mat4 transform;
+uniform vec2 camTopLeft;
 uniform float size;
-uniform float aspect;
 
 layout (points) in;
 
@@ -22,19 +23,19 @@ out vec2 texCoord;
 void quad(vec4 center) {
     float r = 0.5 * size;
 
-    gl_Position = center + vec4(-r / aspect, -r, 0.0, 0.0);
+    gl_Position = transform * (center + vec4(-r, -r, 0.0, 0.0));
     texCoord = vec2(-1.0, -1.0);
     EmitVertex();
 
-    gl_Position = center + vec4(r / aspect, -r, 0.0, 0.0);
+    gl_Position = transform * (center + vec4(r, -r, 0.0, 0.0));
     texCoord = vec2(1.0, -1.0);
     EmitVertex();
 
-    gl_Position = center + vec4(-r / aspect, r, 0.0, 0.0);
+    gl_Position = transform * (center + vec4(-r, r, 0.0, 0.0));
     texCoord = vec2(-1.0, 1.0);
     EmitVertex();
 
-    gl_Position = center + vec4(r / aspect, r, 0.0, 0.0);
+    gl_Position = transform * (center + vec4(r, r, 0.0, 0.0));
     texCoord = vec2(1.0, 1.0);
     EmitVertex();
 
@@ -44,6 +45,8 @@ void quad(vec4 center) {
 void main() {
     fColor = vColor[0];
     vec4 center = gl_in[0].gl_Position;
+
+    center -= vec4(camTopLeft, 0.0, 0.0);
 
     quad(center);
 }

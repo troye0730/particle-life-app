@@ -1,6 +1,9 @@
 package com.particle_life.app;
 
 import com.particle_life.app.shaders.*;
+import com.particle_life.app.utils.*;
+import org.joml.Matrix4d;
+import org.joml.Vector2d;
 import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
@@ -49,8 +52,13 @@ public class App {
     private static final Random random = new Random();
 
     // helper class
+    private final Matrix4d transform = new Matrix4d();
     private final ParticleRenderer particleRenderer = new ParticleRenderer();
     private ParticleShader particleShader;
+
+    // particle rendering: controls
+    private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
+    private double camSize = 1.0;
 
     private void launch(String title, boolean fullscreen,
                         int glContextVersionMajor, int glContextVersionMinor) {
@@ -184,8 +192,8 @@ public class App {
         float scale = 0.3f;
         for (int i = 0; i < particleNums; i++) {
             final int i3 = i * 3;
-            positions[i3] = 1.0;
-            positions[i3 + 1] = 1.0;
+            positions[i3] = 0.5;
+            positions[i3 + 1] = 0.5;
             positions[i3 + 2] = 0.0;
         }
     }
@@ -238,9 +246,43 @@ public class App {
 
     private void render() {
         particleRenderer.bufferParticleData(particleShader, positions);
+
+        int texWidth, texHeight;
+
+        int desiredTexSize = (int) Math.round(Math.min(width, height) / camSize);
+        if (camSize > 1) {
+            texWidth = desiredTexSize;
+            texHeight = desiredTexSize;
+            new NormalizedDeviceCoordinates(
+                    new Vector2d(0.5, 0.5),  // center camera
+                    new Vector2d(1, 1)  // capture whole screen
+            ).getMatrix(transform);
+        } else {
+            texWidth = width;
+            texHeight = height;
+            Vector2d texCamSize = new Vector2d(camSize);
+            if (width > height) texCamSize.x *= (double) texWidth / texHeight;
+            else if (height > width) texCamSize.y *= (double) texHeight / texWidth;
+            new NormalizedDeviceCoordinates(
+                    new Vector2d(texCamSize.x / 2, texCamSize.y / 2),
+                    texCamSize
+            ).getMatrix(transform);
+        }
+
         particleShader.use();
+
+        particleShader.setTransform(transform);
+
+        CamOperations cam = new CamOperations(camPos, camSize, width, height);
+        CamOperations.BoundingBox camBox = cam.getBoundingBox();
+        if (camSize > 1) {
+            particleShader.setCamTopLeft(0, 0);
+        } else {
+            particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
+        }
+
         particleShader.setSize(particleSize);
-        particleShader.setAspect((float) width / (float) height);
+
         particleRenderer.drawParticles();
     }
 }
