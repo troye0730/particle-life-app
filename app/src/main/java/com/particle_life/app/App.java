@@ -1,9 +1,11 @@
 package com.particle_life.app;
 
+import com.particle_life.*;
 import com.particle_life.app.shaders.*;
 import com.particle_life.app.utils.*;
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
+import org.joml.Vector3d;
 import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
@@ -46,8 +48,9 @@ public class App {
     private int windowHeight = -1;
 
     // data
-    private int particleNums = 1;
-    private float particleSize = 0.15f;
+    private int particleNums = 100;
+    private float particleSize = 0.045f;
+    private Particle[] particles = new Particle[particleNums];
     private double[] positions = new double[particleNums * 3];
     private static final Random random = new Random();
 
@@ -189,12 +192,22 @@ public class App {
             return;
         }
 
-        float scale = 0.3f;
+        PositionSetter positionSetter = (position) -> {
+            float scale = 0.3f;
+            position.x = random.nextGaussian() * scale;
+            position.y = random.nextGaussian() * scale;
+            position.x = position.x * 0.5 + 0.5;
+            position.y = position.y * 0.5 + 0.5;
+        };
+
         for (int i = 0; i < particleNums; i++) {
-            final int i3 = i * 3;
-            positions[i3] = 0.5;
-            positions[i3 + 1] = 0.5;
-            positions[i3 + 2] = 0.0;
+            particles[i] = new Particle();
+            Vector3d position = particles[i].position;
+            positionSetter.set(position);
+            final int i3 = 3 * i;
+            positions[i3] = position.x;
+            positions[i3 + 1] = position.y;
+            positions[i3 + 2] = position.z;
         }
     }
 
