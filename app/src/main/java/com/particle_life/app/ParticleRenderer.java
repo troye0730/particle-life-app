@@ -3,6 +3,9 @@ package com.particle_life.app;
 import com.particle_life.app.shaders.ParticleShader;
 
 import static org.lwjgl.opengl.GL11.GL_DOUBLE;
+import static org.lwjgl.opengl.GL11.GL_INT;
+import static org.lwjgl.opengl.GL11.GL_POINTS;
+import static org.lwjgl.opengl.GL11.glDrawArrays;
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_DYNAMIC_DRAW;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
@@ -16,6 +19,7 @@ import static org.lwjgl.opengl.GL30.*;
 class ParticleRenderer {
     private int vao;
     private int vboX;
+    private int vboT;
 
     /**
      * Remember the last buffered size in order to use subBufferData instead of bufferData whenever possible.
@@ -26,15 +30,16 @@ class ParticleRenderer {
     void init() {
         vao = glGenVertexArrays();
         vboX = glGenBuffers();
+        vboT = glGenBuffers();
     }
 
-    void bufferParticleData(ParticleShader particleShader, double[] x) {
+    void bufferParticleData(ParticleShader particleShader, double[] x, int[] types) {
         glBindVertexArray(vao);
 
         // detect change
         boolean shaderChanged = particleShader.shaderProgram != lastShaderProgram;
-        boolean bufferSizeChanged = x.length != lastBufferedSize * 3;
-        lastBufferedSize = x.length / 3;
+        boolean bufferSizeChanged = types.length != lastBufferedSize;
+        lastBufferedSize = types.length;
         lastShaderProgram = particleShader.shaderProgram;
 
         if (shaderChanged) {
@@ -45,6 +50,11 @@ class ParticleRenderer {
                 glVertexAttribPointer(particleShader.xAttribLocation, 3, GL_DOUBLE, false, 0, 0);
                 glEnableVertexAttribArray(particleShader.xAttribLocation);
             }
+            if (particleShader.typeAttribLocation != -1) {
+                glBindBuffer(GL_ARRAY_BUFFER, vboT);
+                glVertexAttribIPointer(particleShader.typeAttribLocation, 1, GL_INT, 0, 0);
+                glEnableVertexAttribArray(particleShader.typeAttribLocation);
+            }
         }
 
         final int usage = GL_DYNAMIC_DRAW;
@@ -52,10 +62,20 @@ class ParticleRenderer {
         if (particleShader.xAttribLocation != -1) {
             glBindBuffer(GL_ARRAY_BUFFER, vboX);
 
-            if (bufferSizeChanged) {
+            if (bufferSizeChanged || shaderChanged) {
                 glBufferData(GL_ARRAY_BUFFER, x, usage);
             } else {
                 glBufferSubData(GL_ARRAY_BUFFER, 0, x);
+            }
+        }
+
+        if (particleShader.typeAttribLocation != -1) {
+            glBindBuffer(GL_ARRAY_BUFFER, vboT);
+
+            if (bufferSizeChanged || shaderChanged) {
+                glBufferData(GL_ARRAY_BUFFER, types, usage);
+            } else {
+                glBufferSubData(GL_ARRAY_BUFFER, 0, types);
             }
         }
     }

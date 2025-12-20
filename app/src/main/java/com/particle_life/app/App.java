@@ -1,6 +1,9 @@
 package com.particle_life.app;
 
 import com.particle_life.*;
+import com.particle_life.app.color.Color;
+import com.particle_life.app.color.Palette;
+import com.particle_life.app.color.PalettesProvider;
 import com.particle_life.app.shaders.*;
 import com.particle_life.app.utils.*;
 import org.joml.Matrix4d;
@@ -47,10 +50,11 @@ public class App {
     private int windowHeight = -1;
 
     // data
-    private int particleNums = 100;
+    private int particleNums = 1000;
     private float particleSize = 0.015f;
     private Particle[] particles = new Particle[particleNums];
     private double[] positions = new double[particleNums * 3];
+    private int[] types = new int[particleNums];
     private double friction = 0.85;
     /**
      * Time that is assumed to have passed between each simulation step, in seconds.
@@ -63,6 +67,8 @@ public class App {
     private TypeSetter typeSetter = new DefaultTypeSetter();
     private MatrixGenerator matrixGenerator = new DefaultMatrixGenerator();
     private Accelerator accelerator;
+    private PalettesProvider palettes;
+    private Palette palette;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -216,14 +222,23 @@ public class App {
             particles[i] = new Particle();
             Particle p = particles[i];
             positionSetter.set(p.position, p.type, matrix.size());
-
-            typeSetter.getType(new Vector3d(p.position), new Vector3d(p.velocity), p.type, matrix.size());
+            p.type = typeSetter.getType(new Vector3d(p.position), new Vector3d(p.velocity), p.type, matrix.size());
 
             final int i3 = 3 * i;
 
             positions[i3] = p.position.x;
             positions[i3 + 1] = p.position.y;
             positions[i3 + 2] = p.position.z;
+
+            types[i] = p.type;
+        }
+
+        palettes = new PalettesProvider();
+        try {
+            palette = palettes.create().get(0);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
         }
     }
 
@@ -276,6 +291,14 @@ public class App {
         return delta;
     }
 
+    private Color[] getColorsFromPalette(int n, Palette palette) {
+        Color[] colors = new Color[n];
+        for (int i = 0; i < n; i++) {
+            colors[i] = palette.getColor(i, n);
+        }
+        return colors;
+    }
+
     private boolean isFullscreen() {
         return glfwGetWindowMonitor(window) != NULL;
     }
@@ -323,7 +346,7 @@ public class App {
     }
 
     private void render() {
-        particleRenderer.bufferParticleData(particleShader, positions);
+        particleRenderer.bufferParticleData(particleShader, positions, types);
 
         int texWidth, texHeight;
 
@@ -349,6 +372,7 @@ public class App {
 
         particleShader.use();
 
+        particleShader.setPalette(getColorsFromPalette(matrix.size(), palette));
         particleShader.setTransform(transform);
 
         CamOperations cam = new CamOperations(camPos, camSize, width, height);
