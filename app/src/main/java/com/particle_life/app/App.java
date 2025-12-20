@@ -69,6 +69,7 @@ public class App {
     private Accelerator accelerator;
     private PalettesProvider palettes;
     private Palette palette;
+    private boolean wrap = true;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -222,6 +223,7 @@ public class App {
             particles[i] = new Particle();
             Particle p = particles[i];
             positionSetter.set(p.position, p.type, matrix.size());
+            ensurePosition(p.position);
             p.type = typeSetter.getType(new Vector3d(p.position), new Vector3d(p.velocity), p.type, matrix.size());
 
             final int i3 = 3 * i;
@@ -279,16 +281,31 @@ public class App {
         // pos += vel * dt;
         p.velocity.mulAdd(dt, p.position, p.position);
 
+        ensurePosition(p.position);
+
         final int i3 = 3 * i;
 
         positions[i3] = p.position.x;
         positions[i3 + 1] = p.position.y;
         positions[i3 + 2] = p.position.z;
+
     }
 
     private Vector3d connection(Vector3d pos1, Vector3d pos2) {
         Vector3d delta = new Vector3d(pos2).sub(pos1);
+        if (wrap) {
+            // wrapping the connection gives us the shortest possible distance
+            Range.wrapConnection(delta);
+        }
         return delta;
+    }
+
+    public void ensurePosition(Vector3d position) {
+        if (wrap) {
+            Range.wrap(position);
+        } else {
+            Range.clamp(position);
+        }
     }
 
     private Color[] getColorsFromPalette(int n, Palette palette) {
