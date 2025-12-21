@@ -8,7 +8,6 @@ import com.particle_life.app.shaders.*;
 import com.particle_life.app.utils.*;
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
-import org.joml.Vector3d;
 import org.lwjgl.Version;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
@@ -49,32 +48,23 @@ public class App {
     private int windowWidth = -1;
     private int windowHeight = -1;
 
-    // data
-    private int particleNums = 1000;
-    private float particleSize = 0.015f;
-    private Particle[] particles = new Particle[particleNums];
-    private double[] positions = new double[particleNums * 3];
-    private int[] types = new int[particleNums];
-    private double friction = 0.85;
-    /**
-     * Time that is assumed to have passed between each simulation step, in seconds.
-     */
-    private double dt = 0.02;
-    private double rmax = 0.2;
-    private double force = 1.0;
-    private Matrix matrix;
-    private PositionSetter positionSetter = new DefaultPositionSetter();
-    private TypeSetter typeSetter = new DefaultTypeSetter();
-    private MatrixGenerator matrixGenerator = new DefaultMatrixGenerator();
-    private Accelerator accelerator;
-    private PalettesProvider palettes;
-    private Palette palette;
-    private boolean wrap = true;
+    private final AppSettings appSettings = new AppSettings();
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
     private final ParticleRenderer particleRenderer = new ParticleRenderer();
     private ParticleShader particleShader;
+
+    private Physics physics;
+    /**
+     * The snapshot is used to store a deep copy of the physics state
+     * (particles, physics settings, ...) just for this thread,
+     * so that the physics simulation can continue modifying the data
+     * in different threads in the meantime.
+     * Otherwise, the renderer could get in trouble if it tries to
+     * access the data while it is being modified by the physics simulation.
+     */
+    private PhysicsSnapshot physicsSnapshot;
 
     // particle rendering: controls
     private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
@@ -96,10 +86,8 @@ public class App {
         setup();
 
         while (!glfwWindowShouldClose(window)) {
-            // use this to wait for events instead of polling, saving CPU
             glfwPollEvents();
 
-            update();
             draw();
 
             glfwSwapBuffers(window); // swap the color buffers
@@ -210,102 +198,27 @@ public class App {
             return;
         }
 
-        matrix = matrixGenerator.makeMatrix(6);
+        createPhysics();
 
-        accelerator = (a, pos) -> {
-            double beta = 0.3;
-            double dist = pos.length();
-            double force = dist < beta ? (dist / beta - 1) : a * (1 - Math.abs(1 + beta - 2 * dist) / (1 - beta));
-            return pos.mul(force / dist);
-        };
-
-        for (int i = 0; i < particleNums; i++) {
-            particles[i] = new Particle();
-            Particle p = particles[i];
-            positionSetter.set(p.position, p.type, matrix.size());
-            ensurePosition(p.position);
-            p.type = typeSetter.getType(new Vector3d(p.position), new Vector3d(p.velocity), p.type, matrix.size());
-
-            final int i3 = 3 * i;
-
-            positions[i3] = p.position.x;
-            positions[i3 + 1] = p.position.y;
-            positions[i3 + 2] = p.position.z;
-
-            types[i] = p.type;
-        }
-
-        palettes = new PalettesProvider();
+        PalettesProvider palettes = new PalettesProvider();
         try {
-            palette = palettes.create().get(0);
+            appSettings.palette = palettes.create().get(0);
         } catch (Exception e) {
             e.printStackTrace();
             return;
         }
     }
 
-    private void update() {
-        for (int i = 0; i < particleNums; i++) {
-            updateVelocity(i);
-            updatePosition(i);
-        }
-    }
-
-    private void updateVelocity(int i) {
-        Particle p = particles[i];
-
-        // apply friction before adding new velocity
-        double frictionFactor = Math.pow(friction, 60 * dt);
-        p.velocity.mul(frictionFactor);
-
-        for (int j = 0; j < particleNums; j++) {
-            if (j == i) continue;
-            Particle q = particles[j];
-
-            Vector3d relativePosition = connection(p.position, q.position);
-
-            double distanceSquared = relativePosition.lengthSquared();
-            if (distanceSquared != 0 && distanceSquared <= rmax * rmax) {
-
-                relativePosition.div(rmax);
-                Vector3d deltaV = accelerator.accelerate(matrix.get(p.type, q.type), relativePosition);
-                // apply force as acceleration
-                p.velocity.add(deltaV.mul(rmax * force * dt));
-            }
-        }
-    }
-
-    private void updatePosition(int i) {
-        Particle p = particles[i];
-
-        // pos += vel * dt;
-        p.velocity.mulAdd(dt, p.position, p.position);
-
-        ensurePosition(p.position);
-
-        final int i3 = 3 * i;
-
-        positions[i3] = p.position.x;
-        positions[i3 + 1] = p.position.y;
-        positions[i3 + 2] = p.position.z;
-
-    }
-
-    private Vector3d connection(Vector3d pos1, Vector3d pos2) {
-        Vector3d delta = new Vector3d(pos2).sub(pos1);
-        if (wrap) {
-            // wrapping the connection gives us the shortest possible distance
-            Range.wrapConnection(delta);
-        }
-        return delta;
-    }
-
-    public void ensurePosition(Vector3d position) {
-        if (wrap) {
-            Range.wrap(position);
-        } else {
-            Range.clamp(position);
-        }
+    private void createPhysics() {
+        Accelerator accelerator = (a, pos) -> {
+            double beta = 0.3;
+            double dist = pos.length();
+            double force = dist < beta ? (dist / beta - 1) : a * (1 - Math.abs(1 + beta - 2 * dist) / (1 - beta));
+            return pos.mul(force / dist);
+        };
+        physics = new Physics(accelerator);
+        physicsSnapshot = new PhysicsSnapshot();
+        physicsSnapshot.take(physics);
     }
 
     private Color[] getColorsFromPalette(int n, Palette palette) {
@@ -355,6 +268,10 @@ public class App {
     }
 
     private void draw() {
+        // update particles
+        physicsSnapshot.take(physics);
+        physics.update();
+
         // clear the framebuffer
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -363,7 +280,7 @@ public class App {
     }
 
     private void render() {
-        particleRenderer.bufferParticleData(particleShader, positions, types);
+        particleRenderer.bufferParticleData(particleShader, physicsSnapshot.positions, physicsSnapshot.types);
 
         int texWidth, texHeight;
 
@@ -389,7 +306,7 @@ public class App {
 
         particleShader.use();
 
-        particleShader.setPalette(getColorsFromPalette(matrix.size(), palette));
+        particleShader.setPalette(getColorsFromPalette(physicsSnapshot.settings.matrix.size(), appSettings.palette));
         particleShader.setTransform(transform);
 
         CamOperations cam = new CamOperations(camPos, camSize, width, height);
@@ -400,7 +317,7 @@ public class App {
             particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
         }
 
-        particleShader.setSize(particleSize);
+        particleShader.setSize(appSettings.particleSize);
 
         particleRenderer.drawParticles();
     }
