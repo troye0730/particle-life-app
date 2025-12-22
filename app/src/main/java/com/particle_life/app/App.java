@@ -122,7 +122,7 @@ public abstract class App {
                 setFullscreen(!isFullscreen());
             }
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                glfwSetWindowShouldClose(window, true); // We will detect this in the rendering loop
+                close();
             }
         });
     }
@@ -167,6 +167,15 @@ public abstract class App {
 
     protected void setup() {}
 
+    protected final void close() {
+        glfwSetWindowShouldClose(window, true);
+    }
+
+    /**
+     * Will be called using v-sync.
+     *
+     * @param dt elapsed time since last call in seconds
+     */
     protected void draw() {}
 
     protected void beforeClose() {}
