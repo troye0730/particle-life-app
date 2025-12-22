@@ -5,7 +5,12 @@ import java.util.concurrent.*;
 
 public class LoadDistributor {
 
-    private final ExecutorService threadPool = Executors.newCachedThreadPool();
+    private final ExecutorService threadPool = Executors.newCachedThreadPool(runnable -> {
+        Thread t = new Thread(runnable);
+        t.setDaemon(true);
+        t.setName("Physics-Worker");
+        return t;
+    });
 
     public interface IndexProcessor {
         /**
