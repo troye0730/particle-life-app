@@ -33,7 +33,6 @@ public class Loop {
      * <p>This won't have any effect on the actual framerate returned by {@link #getActualDt()}.
      */
     public double maxDt = 1.0 / 20.0; // min. 20 fps
-    public double targetFps = 120.0;
 
     /**
      * If this is <code>true</code>, the callback won't be called in the loop.
@@ -110,8 +109,6 @@ public class Loop {
 
     private void loop(Callback loop) {
 
-        long startTime = System.nanoTime();
-
         clock.tick();
 
         processCommandQueue();
@@ -120,21 +117,6 @@ public class Loop {
 
         if (!pause) {
             loop.call(computeDt());
-        }
-
-        if (targetFps > 0) {
-            long targetNanosPerFrame = (long) (1_000_000_000.0 / targetFps);
-            long elapsedNanos = System.nanoTime() - startTime;
-            long sleepNanos = targetNanosPerFrame - elapsedNanos;
-
-            if (sleepNanos > 0) {
-                try {
-                    // 将纳秒转为毫秒和剩余纳秒进行休眠
-                    Thread.sleep(sleepNanos / 1_000_000, (int) (sleepNanos % 1_000_000));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt(); // 保持中断状态
-                }
-            }
         }
     }
 
