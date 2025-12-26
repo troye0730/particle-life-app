@@ -58,7 +58,7 @@ public class ImGuiLayer {
         io.setMouseDown(mouseDown);
     }
 
-    public void setIO(int width, int height) {
+    public void setIO(final float dt, int width, int height) {
         float[] winWidth = new float[]{width};
         float[] winHeight = new float[]{height};
         double[] mousePosX = new double[]{0};
@@ -70,6 +70,7 @@ public class ImGuiLayer {
         io.setDisplaySize(winWidth[0], winHeight[0]);
         io.setDisplayFramebufferScale(2f, 2f);
         io.setMousePos((float) mousePosX[0], (float) mousePosY[0]);
+        io.setDeltaTime(dt);
     }
 
     // If you want to clean a room after yourself - do it by yourself

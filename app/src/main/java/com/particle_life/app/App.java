@@ -1,5 +1,6 @@
 package com.particle_life.app;
 
+import com.particle_life.Clock;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
 
@@ -38,11 +39,16 @@ public abstract class App {
 
         setup();
 
+        Clock guiClock = new Clock(1);
+
         while (!glfwWindowShouldClose(window)) {
+            guiClock.tick();
+
             glfwPollEvents();
             imGuiLayer.processEvents();
 
-            imGuiLayer.setIO(width, height);
+            double dt = guiClock.getDtMillis() / 1000.0;
+            imGuiLayer.setIO((float) dt, width, height);
             draw();
 
             glfwSwapBuffers(window); // swap the color buffers
