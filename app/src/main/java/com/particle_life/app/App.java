@@ -21,7 +21,7 @@ public abstract class App {
     private int windowHeight = -1;
 
     public void launch(String title, boolean fullscreen,
-                        int glContextVersionMajor, int glContextVersionMinor) {
+                       int glContextVersionMajor, int glContextVersionMinor) {
 
         init(title, fullscreen, glContextVersionMajor, glContextVersionMinor);
 
@@ -32,13 +32,17 @@ public abstract class App {
         // bindings available for use.
         GL.createCapabilities();
 
+        ImGuiLayer imGuiLayer = new ImGuiLayer(window);
+        imGuiLayer.initImGui();
         setCallbacks();
 
         setup();
 
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+            imGuiLayer.processEvents();
 
+            imGuiLayer.setIO(width, height);
             draw();
 
             glfwSwapBuffers(window); // swap the color buffers
@@ -52,6 +56,8 @@ public abstract class App {
         glfwTerminate();
 
         beforeClose();
+
+        imGuiLayer.destroyImGui();
     }
 
     private void init(String title, boolean fullscreen,
@@ -127,11 +133,11 @@ public abstract class App {
         });
     }
 
-    private boolean isFullscreen() {
+    protected boolean isFullscreen() {
         return glfwGetWindowMonitor(window) != NULL;
     }
 
-    private void setFullscreen(boolean fullscreen) {
+    protected void setFullscreen(boolean fullscreen) {
         if (isFullscreen() == fullscreen) {
             return;
         }

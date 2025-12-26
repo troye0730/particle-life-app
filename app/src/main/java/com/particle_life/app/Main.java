@@ -4,6 +4,11 @@ import com.particle_life.*;
 import com.particle_life.app.color.*;
 import com.particle_life.app.shaders.ParticleShader;
 import com.particle_life.app.utils.*;
+import imgui.ImGui;
+import imgui.flag.*;
+import imgui.gl3.ImGuiImplGl3;
+import imgui.type.ImBoolean;
+
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
 import org.lwjgl.Version;
@@ -32,10 +37,13 @@ public class Main extends App {
 
     private final AppSettings appSettings = new AppSettings();
 
+    // data
+    private ParticleShader particleShader;
+
     // helper class
     private final Matrix4d transform = new Matrix4d();
     private final ParticleRenderer particleRenderer = new ParticleRenderer();
-    private ParticleShader particleShader;
+    private final ImGuiImplGl3 imGuiGl3 = new ImGuiImplGl3();
 
     private Physics physics;
     private Loop loop;
@@ -53,6 +61,13 @@ public class Main extends App {
     private final Vector2d camPos = new Vector2d(0.5, 0.5); // world center
     private double camSize = 1.0;
 
+    // GUI: hide / show parts
+    private final ImBoolean showGui = new ImBoolean(true);
+    private final ImBoolean showGraphicsWindow = new ImBoolean(false);
+    private final ImBoolean showControlsWindow = new ImBoolean(false);
+    private final ImBoolean showAboutWindow = new ImBoolean(false);
+    private final ImBoolean showSavesPopup = new ImBoolean(false);
+
     @Override
     protected void setup() {
         LWJGL_VERSION = Version.getVersion();
@@ -66,6 +81,11 @@ public class Main extends App {
         System.out.println("OpenGL Renderer: " + OPENGL_RENDERER);
         System.out.println("OpenGL Version: " + OPENGL_VERSION);
         System.out.println("GLSL Version: " + GLSL_VERSION);
+
+        // Method initializes LWJGL3 renderer.
+        // This method SHOULD be called after you've initialized your ImGui configuration (fonts and so on).
+        // ImGui context should be created as well.
+        imGuiGl3.init("#version 410 core");
 
         particleRenderer.init();
 
@@ -114,6 +134,7 @@ public class Main extends App {
             loop.kill();
             physics.kill();
         }
+        imGuiGl3.shutdown();
     }
 
     private Color[] getColorsFromPalette(int n, Palette palette) {
@@ -126,16 +147,97 @@ public class Main extends App {
 
     @Override
     protected void draw() {
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+
         // update particles
         loop.doOnce(() -> {
             physicsSnapshot.take(physics);
         });
 
-        // clear the framebuffer
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
         render();
+
+        imGuiGl3.newFrame();
+        // render GUI
+        // Note: Any Dear ImGui code must go between ImGui.newFrame() and ImGui.render().
+        ImGui.newFrame();
+        buildGui();
+        ImGui.render();
+
+        imGuiGl3.renderDrawData(ImGui.getDrawData());
+    }
+
+    private void buildGui() {
+        if (showGui.get()) {
+            // MAIN MENU
+            ImGui.setNextWindowSize(-1, -1, ImGuiCond.FirstUseEver);
+            ImGui.setNextWindowPos(0, 0, ImGuiCond.Always);
+            ImGui.pushStyleVar(ImGuiStyleVar.WindowRounding, 0);
+            ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 4f, 0f);
+            ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize, 0f, 0f);
+            if (ImGui.begin("Particle Life Simulator",
+                ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus
+                    | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.MenuBar)) {
+                ImGui.popStyleVar(3);
+                if (ImGui.beginMenuBar()) {
+                    buildMainMenu();
+                    ImGui.endMenuBar();
+                }
+            }
+            ImGui.end();
+        }
+    }
+
+    private void buildMainMenu() {
+        if (ImGui.beginMenu("Menu")) {
+
+            if (ImGui.menuItem("Saves##menu", "Ctrl+s")) {
+                showSavesPopup.set(true);
+            }
+
+            if (ImGui.menuItem("Controls..")) {
+                showControlsWindow.set(true);
+            }
+
+            if (ImGui.menuItem("About..")) {
+                showAboutWindow.set(true);
+            }
+
+            if (ImGui.menuItem("Quit", "Alt+F4, q")) {
+                close();
+            }
+
+            ImGui.endMenu();
+        }
+
+        if (ImGui.beginMenu("View")) {
+
+            if (isFullscreen()) {
+                if (ImGui.menuItem("Exit Fullscreen", "F11, f")) {
+                    setFullscreen(false);
+                }
+            } else {
+                if (ImGui.menuItem("Fullscreen", "F11, f")) {
+                    setFullscreen(true);
+                }
+            }
+
+            if (ImGui.menuItem("Hide GUI", "Esc")) {
+                showGui.set(false);
+            }
+
+            if (ImGui.beginMenu("Zoom")) {
+                if (ImGui.menuItem("100%", "z")) {}
+                if (ImGui.menuItem("Fit", "Z")) {}
+                ImGui.endMenu();
+            }
+
+            if (ImGui.menuItem("Graphics..", "g")) {
+                showGraphicsWindow.set(true);
+            }
+
+            ImGui.endMenu();
+        }
     }
 
     private void render() {

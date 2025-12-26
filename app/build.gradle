@@ -8,6 +8,8 @@ plugins {
 ext {
     lwjglVersion = '3.3.0'
     lwjglNatives = "natives-macos-arm64"
+    imguiVersion = "1.90.0"
+    imguiNatives = "macos"
 }
 
 repositories {
@@ -17,6 +19,11 @@ repositories {
 dependencies {
     // Linear Algebra Library "JOML"
     implementation 'org.joml:joml:1.10.1'
+
+    // GUI Library "Dear ImGui"
+    implementation "io.github.spair:imgui-java-binding:$imguiVersion"
+    implementation "io.github.spair:imgui-java-natives-$imguiNatives:$imguiVersion"
+    implementation "io.github.spair:imgui-java-lwjgl3:$imguiVersion"
     
     // Lightweight Java Game Library "LWJGL" (code from https://www.lwjgl.org/customize)
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
