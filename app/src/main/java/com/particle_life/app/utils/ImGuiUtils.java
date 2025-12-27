@@ -30,4 +30,10 @@ public final class ImGuiUtils {
             ImGui.endTooltip();
         }
     }
+
+    public static void separator() {
+        ImGui.dummy(0, 2);
+        ImGui.separator();
+        ImGui.dummy(0, 2);
+    }
 }

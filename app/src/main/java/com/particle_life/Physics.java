@@ -197,6 +197,55 @@ public class Physics {
     }
 
     /**
+     * This is a convenience method for quickly changing the matrix size
+     * and getting the expected results.<br>
+     * This method takes care of:
+     * <ul>
+     *     <li>re-using values from the old matrix</li>
+     *     <li>generating new matrix values using the {@link #matrixGenerator}</li>
+     *     <li>changing the types of particles that are not within the the new matrix size
+     *         using the current {@link #typeSetter type setter}.</li>
+     * </ul>
+     *
+     * @see #ensureTypes()
+     */
+    public void setMatrixSize(int newSize) {
+        Matrix prevMatrix = settings.matrix;
+        int prevSize = prevMatrix.size();
+        if (newSize == prevSize) return;  // keep previous matrix
+
+        settings.matrix = matrixGenerator.makeMatrix(newSize);
+
+        assert settings.matrix.size() == newSize;
+
+        // copy as much as possible from previous matrix
+        int commonSize = Math.min(prevSize, newSize);
+        for (int i = 0; i < commonSize; i++) {
+            for (int j = 0; j < commonSize; j++) {
+                settings.matrix.set(i, j, prevMatrix.get(i, j));
+            }
+        }
+
+        if (newSize < prevSize) {
+            ensureTypes(); // need to change types of particles that are not in the new matrix
+        }
+    }
+
+    /**
+     * Ensures that all particles have a type that is within the matrix size.
+     * You should call this method after {@code settings.matrix} was set to a matrix of different size.<br>
+     * All particles that have a type that is not within the matrix size
+     * are assigned a new type using the current {@link #typeSetter type setter}.
+     */
+    public void ensureTypes() {
+        for (Particle p : particles) {
+            if (p.type >= settings.matrix.size()) {
+                setType(p);
+            }
+        }
+    }
+
+    /**
      * Use this to avoid the container pattern showing
      * (i.e. if particles are treated differently depending on their position in the
      * array).

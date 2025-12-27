@@ -8,6 +8,7 @@ import imgui.ImGui;
 import imgui.flag.*;
 import imgui.gl3.ImGuiImplGl3;
 import imgui.type.ImBoolean;
+import imgui.type.ImFloat;
 import imgui.type.ImInt;
 
 import org.joml.Matrix4d;
@@ -216,6 +217,27 @@ public class Main extends App {
                         settings.matrix,
                         (i, j, newValue) -> loop.enqueue(() -> physics.settings.matrix.set(i, j, newValue))
                 );
+                if (ImGui.button("Copy")) {
+                    ImGui.setClipboardText(MatrixParser.matrixToString(settings.matrix));
+                }
+                ImGui.sameLine();
+                if (ImGui.button("Paste")) {
+                    Matrix parsedMatrix = MatrixParser.parseMatrix(ImGui.getClipboardText());
+                    if (parsedMatrix != null) {
+                        loop.enqueue(() -> {
+                            physics.setMatrixSize(parsedMatrix.size());
+                            physics.settings.matrix = parsedMatrix;
+                        });
+                    }
+                }
+                ImGuiUtils.helpMarker("Save / load matrix via the clipboard.");
+                if (ImGui.treeNode("Settings##matrix")) {
+                    ImFloat inputValue = new ImFloat((float) appSettings.matrixGuiStepSize);
+                    if (ImGui.inputFloat("Step Size##Matrix", inputValue, 0.05f, 0.05f, "%.2f")) {
+                        appSettings.matrixGuiStepSize = MathUtils.clamp(inputValue.get(), 0.05f, 1.0f);
+                    }
+                    ImGui.treePop();
+                }
 
                 ImGui.popItemWidth();
             }
