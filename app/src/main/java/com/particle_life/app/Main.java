@@ -309,6 +309,61 @@ public class Main extends App {
                 } else {
                     ImGui.text("");
                 }
+
+                // SliderFloat Block
+                ImGuiUtils.numberInput("rmax",
+                        0.005f, 1f,
+                        (float) settings.rmax,
+                        "%.3f",
+                        value -> loop.enqueue(() -> physics.settings.rmax = value));
+                ImGuiUtils.helpMarker("The distance at which particles interact.");
+
+                ImGuiUtils.numberInput("Friction Coefficient",
+                        0f, 1f,
+                        (float) settings.friction,
+                        "%.3f",
+                        value -> loop.enqueue(() -> physics.settings.friction = value),
+                        false);
+                ImGuiUtils.helpMarker("The velocity of all particles is multiplied with this value" +
+                        " in each update step to simulate friction (assuming 60 fps).");
+
+                ImGuiUtils.numberInput("Force Scaling",
+                        0f, 100f,
+                        (float) settings.force,
+                        "%.1f",
+                        value -> loop.enqueue(() -> physics.settings.force = value));
+                ImGuiUtils.helpMarker("Scales the forces between all particles with a constant factor.");
+
+                ImGuiUtils.separator();
+
+                if (ImGui.checkbox("Periodic Boundaries", settings.wrap)) {
+                    final boolean newWrap = !settings.wrap;
+                    loop.enqueue(() -> physics.settings.wrap = newWrap);
+                }
+                ImGuiUtils.helpMarker("[b] Determines if the space wraps around at the borders or not.");
+
+                if (appSettings.autoDt) ImGui.beginDisabled();
+                ImGuiUtils.numberInput(
+                        "Time Step",
+                        0, 100,
+                        (float) appSettings.dt * 1000f,
+                        "%.2f ms",
+                        value -> appSettings.dt = Math.max(0, value / 1000));
+                if (appSettings.autoDt) ImGui.endDisabled();
+                ImGui.sameLine();
+                if (ImGui.checkbox("Auto", appSettings.autoDt)) appSettings.autoDt ^= true;
+                ImGuiUtils.helpMarker("[ctrl+shift+scroll] The time step of the physics computation." +
+                        "\nIf 'Auto' is ticked, the time step will be chosen automatically based on the real passed time.");
+
+                ImInt threadNumberInput = new ImInt(preferredNumberOfThreads);
+                if (ImGui.inputInt("Threads", threadNumberInput, 1, 1, ImGuiInputTextFlags.EnterReturnsTrue)) {
+                    final int newThreadNumber = Math.max(1, threadNumberInput.get());
+                    loop.enqueue(() -> physics.preferredNumberOfThreads = newThreadNumber);
+                }
+                ImGuiUtils.helpMarker("The number of threads used by your processor for the physics computation." +
+                        "\n(If you don't know what this means, just ignore it.)");
+
+                ImGui.popItemWidth();
             }
             ImGui.end();
         }
