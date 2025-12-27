@@ -2,7 +2,9 @@ package com.particle_life.app;
 
 import com.particle_life.*;
 import com.particle_life.app.color.*;
+import com.particle_life.app.selection.SelectionManager;
 import com.particle_life.app.shaders.ParticleShader;
+import com.particle_life.app.shaders.ShaderProvider;
 import com.particle_life.app.utils.*;
 import imgui.ImGui;
 import imgui.flag.*;
@@ -15,7 +17,6 @@ import org.joml.Matrix4d;
 import org.joml.Vector2d;
 import org.lwjgl.Version;
 
-import java.io.IOException;
 import java.util.Arrays;
 
 import static org.lwjgl.opengl.GL11C.*;
@@ -41,7 +42,7 @@ public class Main extends App {
     private final AppSettings appSettings = new AppSettings();
 
     // data
-    private ParticleShader particleShader;
+    private SelectionManager<ParticleShader> shaders;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -103,12 +104,17 @@ public class Main extends App {
         particleRenderer.init();
 
         try {
-            particleShader = new ParticleShader("src/main/resources/shaders/default.vert",
-                    "src/main/resources/shaders/default.geom",
-                    "src/main/resources/shaders/default.frag");
-        } catch (IOException e) {
+            shaders = new SelectionManager<>(new ShaderProvider());
+        } catch (Exception e) {
             e.printStackTrace();
             return;
+        }
+
+        try {
+            shaders.setActivesByName(appSettings.shader);
+        } catch (IllegalArgumentException e) {
+            // todo: emit warning
+            shaders.setActive(0);
         }
 
         createPhysics();
@@ -424,6 +430,7 @@ public class Main extends App {
     }
 
     private void render() {
+        ParticleShader particleShader = shaders.getActive();
         particleRenderer.bufferParticleData(particleShader,
             physicsSnapshot.positions,
             physicsSnapshot.types);

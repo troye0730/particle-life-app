@@ -20,9 +20,12 @@ public class ParticleShader {
 
     private final float[] transform = new float[16];
 
+    public final BlendMode blendMode;
+
     public ParticleShader(String vertexShaderSource,
                           String geometryShaderResource,
-                          String fragmentShaderResource) throws IOException {
+                          String fragmentShaderResource,
+                          BlendMode blendMode) throws IOException {
 
         shaderProgram = ShaderUtil.makeShaderProgram(vertexShaderSource, geometryShaderResource, fragmentShaderResource);
 
@@ -34,6 +37,8 @@ public class ParticleShader {
 
         xAttribLocation = glGetAttribLocation(shaderProgram, "x");
         typeAttribLocation = glGetAttribLocation(shaderProgram, "type");
+
+        this.blendMode = blendMode;
     }
 
     /**

@@ -1,0 +1,5 @@
+name: "default"
+vertex: "default.vert"
+geometry: "default.geom"
+fragment: "default.frag"
+blend: "normal"

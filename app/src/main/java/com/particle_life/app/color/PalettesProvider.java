@@ -28,7 +28,7 @@ public class PalettesProvider {
     private List<Palette> loadPalettesFromFiles() throws IOException, URISyntaxException {
         List<Palette> palettes = new ArrayList<>();
 
-        List<Path> paletteFiles = ResourceAccess.listFiles("src/main/resources/palettes");
+        List<Path> paletteFiles = ResourceAccess.listFiles("palettes");
 
         paletteFiles.sort(Path::compareTo);
 
