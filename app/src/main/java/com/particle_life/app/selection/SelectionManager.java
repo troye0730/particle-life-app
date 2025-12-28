@@ -43,7 +43,7 @@ public class SelectionManager<T> {
     }
 
     public void setActivesByName(String name) {
-        int i = getIndexByNmae(name);
+        int i = getIndexByName(name);
         if (i == -1) {
             throw new IllegalArgumentException("No item with name '%s' found in selection.".formatted(name));
         }
@@ -65,13 +65,20 @@ public class SelectionManager<T> {
     }
 
     /**
+     * Returns whether there exists an item whose name is equal to the given string.
+     */
+    public boolean hasName(String name) {
+        return getIndexByName(name) != -1;
+    }
+
+    /**
      * Returns the index of the first element whose name is equal to the given string.
      * If no such element can be found, -1 is returned.
      *
      * @param name the name of the item
      * @return the index of the first element with that name, or -1
      */
-    public int getIndexByNmae(String name) {
+    public int getIndexByName(String name) {
         int i = 0;
         for (InfoWrapper<T> item : items) {
             if (name.equals(item.name)) {

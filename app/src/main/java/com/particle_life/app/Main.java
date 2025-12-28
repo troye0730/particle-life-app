@@ -43,6 +43,7 @@ public class Main extends App {
 
     // data
     private SelectionManager<ParticleShader> shaders;
+    private SelectionManager<Palette> palettes;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -105,6 +106,7 @@ public class Main extends App {
 
         try {
             shaders = new SelectionManager<>(new ShaderProvider());
+            palettes = new SelectionManager<>(new PalettesProvider());
         } catch (Exception e) {
             e.printStackTrace();
             return;
@@ -121,12 +123,9 @@ public class Main extends App {
         loop = new Loop();
         loop.start(this::updatePhysics);
 
-        PalettesProvider palettes = new PalettesProvider();
-        try {
-            appSettings.palette = palettes.create().get(0);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return;
+        // set default selection for palette
+        if (palettes.hasName(appSettings.palette)) {
+            palettes.setActive(palettes.getIndexByName(appSettings.palette));
         }
     }
 
@@ -223,7 +222,7 @@ public class Main extends App {
 
                 // MATRIX
                 ImGuiMatrix.draw(200 * scale, 200 * scale,
-                        appSettings.palette,
+                        palettes.getActive(),
                         appSettings.matrixGuiStepSize,
                         settings.matrix,
                         (i, j, newValue) -> loop.enqueue(() -> physics.settings.matrix.set(i, j, newValue))
@@ -260,7 +259,7 @@ public class Main extends App {
                 }
 
                 ImGuiBarGraph.draw(200, 100,
-                        appSettings.palette,
+                        palettes.getActive(),
                         typeCountDiagramStepSize,
                         physicsSnapshot.typeCount,
                         (type, newValue) -> {
@@ -463,7 +462,7 @@ public class Main extends App {
 
         particleShader.use();
 
-        particleShader.setPalette(getColorsFromPalette(settings.matrix.size(), appSettings.palette));
+        particleShader.setPalette(getColorsFromPalette(settings.matrix.size(), palettes.getActive()));
         particleShader.setTransform(transform);
 
         CamOperations cam = new CamOperations(camPos, camSize, width, height);

@@ -1,5 +1,9 @@
 package com.particle_life.app.color;
 
+import com.particle_life.app.io.ResourceAccess;
+import com.particle_life.app.selection.InfoWrapper;
+import com.particle_life.app.selection.InfoWrapperProvider;
+
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -9,12 +13,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import com.particle_life.app.io.ResourceAccess;
+public class PalettesProvider implements InfoWrapperProvider<Palette> {
 
-public class PalettesProvider {
-
-    public List<Palette> create() throws Exception {
-        List<Palette> palettes = new ArrayList<>();
+    @Override
+    public List<InfoWrapper<Palette>> create() throws Exception {
+        List<InfoWrapper<Palette>> palettes = new ArrayList<>();
 
         try {
             palettes.addAll(loadPalettesFromFiles());
@@ -22,11 +25,18 @@ public class PalettesProvider {
             e.printStackTrace();
         }
 
+        // ensure that the default palette is always present, even if the user deletes it
+        if (palettes.stream().noneMatch(p -> p.name.equals("Natural Rainbow.map"))) {
+            palettes.add(new InfoWrapper<>("Natural Rainbow", new NaturalRainbowPalette()));
+        }
+
+        palettes.add(new InfoWrapper<>("Digital Rainbow", new SimpleRainbowPalette()));
+
         return palettes;
     }
 
-    private List<Palette> loadPalettesFromFiles() throws IOException, URISyntaxException {
-        List<Palette> palettes = new ArrayList<>();
+    private List<InfoWrapper<Palette>> loadPalettesFromFiles() throws IOException, URISyntaxException {
+        List<InfoWrapper<Palette>> palettes = new ArrayList<>();
 
         List<Path> paletteFiles = ResourceAccess.listFiles("palettes");
 
@@ -44,7 +54,7 @@ public class PalettesProvider {
             Optional<Palette> palette = parsePalette(fileContent);
 
             if (palette.isPresent()) {
-                palettes.add(palette.get());
+                palettes.add(new InfoWrapper<>(path.getFileName().toString(), palette.get()));
             }
         }
 
