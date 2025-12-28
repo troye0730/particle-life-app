@@ -174,37 +174,91 @@ public class Main extends App {
         imGuiGl3.shutdown();
     }
 
-    private Color[] getColorsFromPalette(int n, Palette palette) {
-        Color[] colors = new Color[n];
-        for (int i = 0; i < n; i++) {
-            colors[i] = palette.getColor(i, n);
-        }
-        return colors;
-    }
-
     @Override
     protected void draw() {
         renderClock.tick();
+        updateCanvas();
+
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // update particles
-        loop.doOnce(() -> {
-            physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
-            newSnapshotAvailable.set(true);
-        });
+        int texWidth, texHeight;
 
-        render();
+        // todo: make this part look less like magic
+        int desiredTexSize = (int) Math.round(Math.min(width, height) / camSize);
+        if (camSize > 1) {
+            texWidth = desiredTexSize;
+            texHeight = desiredTexSize;
+            new NormalizedDeviceCoordinates(
+                    new Vector2d(0.5, 0.5), // center camera
+                    new Vector2d(1, 1) // capture whole screen
+            ).getMatrix(transform);
+        } else {
+            texWidth = width;
+            texHeight = height;
+            Vector2d texCamSize = new Vector2d(camSize);
+            if (width > height)
+                texCamSize.x *= (double) texWidth / texHeight;
+            else if (height > width)
+                texCamSize.y *= (double) texHeight / texWidth;
+            new NormalizedDeviceCoordinates(
+                    new Vector2d(texCamSize.x / 2, texCamSize.y / 2),
+                    texCamSize).getMatrix(transform);
+        }
+
+        ParticleShader particleShader = shaders.getActive();
+        
+        // set shader variables
+        particleShader.use();
+
+        particleShader.setPalette(getColorsFromPalette(settings.matrix.size(), palettes.getActive()));
+        particleShader.setTransform(transform);
+
+        CamOperations cam = new CamOperations(camPos, camSize, width, height);
+        CamOperations.BoundingBox camBox = cam.getBoundingBox();
+        if (camSize > 1) {
+            particleShader.setCamTopLeft(0, 0);
+        } else {
+            particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
+        }
+
+        particleShader.setSize(appSettings.particleSize * 2 * (float) settings.rmax);
+
+        particleRenderer.drawParticles();
 
         imGuiGl3.newFrame();
+
         // render GUI
-        // Note: Any Dear ImGui code must go between ImGui.newFrame() and
-        // ImGui.render().
+        // Note: Any Dear ImGui code must go between ImGui.newFrame() and ImGui.render().
         ImGui.newFrame();
         buildGui();
         ImGui.render();
 
         imGuiGl3.renderDrawData(ImGui.getDrawData());
+    }
+
+    /**
+     * Render particles, cursor etc., i.e. everything except the GUI elements.
+     */
+    private void updateCanvas() {
+        if (newSnapshotAvailable.get()) {
+
+            // get local copy of snapshot
+
+            particleRenderer.bufferParticleData(shaders.getActive(),
+                    physicsSnapshot.positions,
+                    physicsSnapshot.types);
+            settings = physicsSnapshot.settings.deepCopy();
+            particleCount = physicsSnapshot.particleCount;
+            preferredNumberOfThreads = physics.preferredNumberOfThreads;
+
+            newSnapshotAvailable.set(false);
+        }
+
+        loop.doOnce(() -> {
+            physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
+            newSnapshotAvailable.set(true);
+        });
     }
 
     private void buildGui() {
@@ -508,60 +562,11 @@ public class Main extends App {
         }
     }
 
-    private void render() {
-        ParticleShader particleShader = shaders.getActive();
-        if (newSnapshotAvailable.get()) {
-
-            // get local copy of snapshot
-
-            particleRenderer.bufferParticleData(particleShader,
-                    physicsSnapshot.positions,
-                    physicsSnapshot.types);
-            settings = physicsSnapshot.settings.deepCopy();
-            particleCount = physicsSnapshot.particleCount;
-            preferredNumberOfThreads = physics.preferredNumberOfThreads;
-
-            newSnapshotAvailable.set(false);
+    private Color[] getColorsFromPalette(int n, Palette palette) {
+        Color[] colors = new Color[n];
+        for (int i = 0; i < n; i++) {
+            colors[i] = palette.getColor(i, n);
         }
-
-        int texWidth, texHeight;
-
-        int desiredTexSize = (int) Math.round(Math.min(width, height) / camSize);
-        if (camSize > 1) {
-            texWidth = desiredTexSize;
-            texHeight = desiredTexSize;
-            new NormalizedDeviceCoordinates(
-                    new Vector2d(0.5, 0.5), // center camera
-                    new Vector2d(1, 1) // capture whole screen
-            ).getMatrix(transform);
-        } else {
-            texWidth = width;
-            texHeight = height;
-            Vector2d texCamSize = new Vector2d(camSize);
-            if (width > height)
-                texCamSize.x *= (double) texWidth / texHeight;
-            else if (height > width)
-                texCamSize.y *= (double) texHeight / texWidth;
-            new NormalizedDeviceCoordinates(
-                    new Vector2d(texCamSize.x / 2, texCamSize.y / 2),
-                    texCamSize).getMatrix(transform);
-        }
-
-        particleShader.use();
-
-        particleShader.setPalette(getColorsFromPalette(settings.matrix.size(), palettes.getActive()));
-        particleShader.setTransform(transform);
-
-        CamOperations cam = new CamOperations(camPos, camSize, width, height);
-        CamOperations.BoundingBox camBox = cam.getBoundingBox();
-        if (camSize > 1) {
-            particleShader.setCamTopLeft(0, 0);
-        } else {
-            particleShader.setCamTopLeft((float) camBox.left, (float) camBox.top);
-        }
-
-        particleShader.setSize(appSettings.particleSize * 2 * (float) settings.rmax);
-
-        particleRenderer.drawParticles();
+        return colors;
     }
 }
