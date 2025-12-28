@@ -1,6 +1,8 @@
 package com.particle_life.app;
 
 import imgui.*;
+import imgui.flag.ImGuiCol;
+import imgui.flag.ImGuiDir;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -33,6 +35,36 @@ public class ImGuiLayer {
         fontAtlas.addFontFromFileTTF(".internal/Futura Heavy font.ttf", 16, fontConfig);
         fontAtlas.addFontDefault(); // Add a default font, which is 'ProggyClean.ttf, 13px'
         fontConfig.destroy(); // After all fonts were added we don't need this config anymore
+
+        // set style
+        ImGuiStyle style = ImGui.getStyle();
+        style.setFrameBorderSize(0);
+        style.setWindowBorderSize(0);
+        style.setFrameRounding(16);
+        style.setFramePadding(12, 5);
+        style.setPopupRounding(8);
+        style.setGrabRounding(3);
+        style.setScrollbarRounding(3);
+        style.setWindowRounding(8);
+        style.setWindowMenuButtonPosition(ImGuiDir.Right);
+        style.setWindowTitleAlign(0.5f, 0.5f);
+        ImGui.styleColorsDark(style);
+        style.setColor(ImGuiCol.Button, 62,99,221, 255);
+        style.setColor(ImGuiCol.ButtonHovered, 92, 115, 231, 255);
+        style.setColor(ImGuiCol.ButtonActive, 168, 177, 255, 255);
+        style.setColor(ImGuiCol.WindowBg, 32, 33, 39, 255);
+        style.setColor(ImGuiCol.TitleBg, 32, 33, 39, 255);
+        style.setColor(ImGuiCol.TitleBgActive, 32, 33, 39, 255);
+        style.setColor(ImGuiCol.TitleBgCollapsed, 32, 33, 39, 255);
+        style.setColor(ImGuiCol.FrameBg, 50,54,63, 255);
+        style.setColor(ImGuiCol.FrameBgHovered, 65,72,83, 255);
+        style.setColor(ImGuiCol.FrameBgActive, 81,92,103, 255);
+        style.setColor(ImGuiCol.SliderGrab, 62,99,221, 255);
+        style.setColor(ImGuiCol.SliderGrabActive, 168, 177, 255, 255);
+        style.setColor(ImGuiCol.CheckMark, 62,99,221, 255);
+        style.setColor(ImGuiCol.HeaderHovered, 62,99,221, 255);
+        style.setColor(ImGuiCol.HeaderActive, 92, 115, 231, 255);
+        style.setColor(ImGuiCol.Separator, 255, 255, 255, 18);
     }
 
     public void processEvents() {
