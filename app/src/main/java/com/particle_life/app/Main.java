@@ -245,6 +245,17 @@ public class Main extends App {
 
                 ImGuiUtils.separator();
 
+                // MATRIX GENERATORS
+                if (ImGuiUtils.renderCombo("##matrix", matrixGenerators)) {
+                    final MatrixGenerator nextMatrixGenerator = matrixGenerators.getActive();
+                    loop.enqueue(() -> physics.matrixGenerator = nextMatrixGenerator);
+                }
+                ImGui.sameLine();
+                if (ImGui.button("Matrix")) {
+                    loop.enqueue(physics::generateMatrix);
+                }
+                ImGuiUtils.helpMarker("[m]");
+
                 // MATRIX
                 ImGuiMatrix.draw(200 * scale, 200 * scale,
                         palettes.getActive(),

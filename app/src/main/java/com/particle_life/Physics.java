@@ -25,7 +25,7 @@ public class Physics {
     private double containerSize = 0.065;// todo: implement makeContainerNeighborhood() to make this independent of rmax
 
     private Accelerator accelerator;
-    private MatrixGenerator matrixGenerator;
+    public MatrixGenerator matrixGenerator;
     public PositionSetter positionSetter;
     /**
      * This is the TypeSetter that is used by default whenever
