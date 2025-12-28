@@ -33,7 +33,7 @@ public class Physics {
      * 
      * @see TypeSetter#getType
      */
-    private TypeSetter typeSetter;
+    public TypeSetter typeSetter;
 
     public int preferredNumberOfThreads = 12;
     private final LoadDistributor loadDistributor = new LoadDistributor();
@@ -478,5 +478,9 @@ public class Physics {
         } else {
             Range.clamp(position);
         }
+    }
+
+    public void setTypes() {
+        Arrays.stream(particles).forEach(p -> setType(p));
     }
 }

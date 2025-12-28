@@ -287,6 +287,19 @@ public class Main extends App {
 
                 ImGuiUtils.separator();
 
+                // TYPE SETTERS
+                ImGuiUtils.renderCombo("##colors", typeSetters);
+                ImGui.sameLine();
+                if (ImGui.button("Colors")) {
+                    loop.enqueue(() -> {
+                        TypeSetter previousTypeSetter = physics.typeSetter;
+                        physics.typeSetter = typeSetters.getActive();
+                        physics.setTypes();
+                        physics.typeSetter = previousTypeSetter;
+                    });
+                }
+                ImGuiUtils.helpMarker("[c] Use this to set colors of particles without changing their position.");
+
                 // NTYPES
                 ImInt matrixSizeInput = new ImInt(settings.matrix.size());
                 if (ImGui.inputInt("Colors##input", matrixSizeInput, 1, 1, ImGuiInputTextFlags.EnterReturnsTrue)) {
