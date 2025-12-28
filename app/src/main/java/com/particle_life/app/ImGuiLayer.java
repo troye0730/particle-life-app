@@ -30,6 +30,11 @@ public class ImGuiLayer {
 
         io.setIniFilename(null); // We don't want to save .ini file
 
+        glfwSetScrollCallback(glfwWindow, (w, xOffset, yOffset) -> {
+            io.setMouseWheelH(io.getMouseWheelH() + (float) xOffset);
+            io.setMouseWheel(io.getMouseWheel() + (float) yOffset);
+        });
+
         final ImFontAtlas fontAtlas = io.getFonts();
         final ImFontConfig fontConfig = new ImFontConfig();
         fontAtlas.addFontFromFileTTF(".internal/Futura Heavy font.ttf", 16, fontConfig);
