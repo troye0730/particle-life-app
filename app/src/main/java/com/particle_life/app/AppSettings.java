@@ -8,4 +8,5 @@ public class AppSettings {
     public String shader = "default";
     public double dt = 0.02;
     public boolean autoDt = false;
+    public String positionSetter = "centered";
 }

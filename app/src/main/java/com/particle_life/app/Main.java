@@ -44,6 +44,7 @@ public class Main extends App {
     // data
     private SelectionManager<ParticleShader> shaders;
     private SelectionManager<Palette> palettes;
+    private SelectionManager<PositionSetter> positionSetters;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -107,6 +108,9 @@ public class Main extends App {
         try {
             shaders = new SelectionManager<>(new ShaderProvider());
             palettes = new SelectionManager<>(new PalettesProvider());
+            positionSetters = new SelectionManager<>(new PositionSetterProvider());
+
+            positionSetters.setActivesByName(appSettings.positionSetter);
         } catch (Exception e) {
             e.printStackTrace();
             return;
