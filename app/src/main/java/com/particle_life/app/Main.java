@@ -42,6 +42,7 @@ public class Main extends App {
     private final AppSettings appSettings = new AppSettings();
 
     // data
+    private final Clock renderClock = new Clock(60);
     private SelectionManager<ParticleShader> shaders;
     private SelectionManager<Palette> palettes;
     private SelectionManager<MatrixGenerator> matrixGenerators;
@@ -177,6 +178,7 @@ public class Main extends App {
 
     @Override
     protected void draw() {
+        renderClock.tick();
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -416,6 +418,28 @@ public class Main extends App {
                 }
                 ImGuiUtils.helpMarker("The number of threads used by your processor for the physics computation." +
                         "\n(If you don't know what this means, just ignore it.)");
+
+                ImGui.popItemWidth();
+            }
+            ImGui.end();
+        }
+
+        // GRAPHICS
+        if (showGraphicsWindow.get()) {
+            ImGui.setNextWindowSize(400, 300);
+            ImGui.setNextWindowPos(width / 2f, height / 2f, ImGuiCond.FirstUseEver, 0.5f, 0.5f);
+            if (ImGui.begin("Graphics", showGraphicsWindow,
+                    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoCollapse)) {
+                ImGui.pushItemWidth(200);
+                ImGui.text(String.format("Graphics FPS: %.0f", renderClock.getAvgFramerate()));
+
+                // SHADERS
+                ImGuiUtils.renderCombo("Shader", shaders);
+                ImGuiUtils.helpMarker("Use this to set how the particles are displayed");
+
+                // PALETTES
+                ImGuiUtils.renderCombo("Palette", palettes);
+                ImGuiUtils.helpMarker("Color of particles");
 
                 ImGui.popItemWidth();
             }
