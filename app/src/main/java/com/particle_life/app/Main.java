@@ -44,6 +44,7 @@ public class Main extends App {
     // data
     private SelectionManager<ParticleShader> shaders;
     private SelectionManager<Palette> palettes;
+    private SelectionManager<MatrixGenerator> matrixGenerators;
     private SelectionManager<PositionSetter> positionSetters;
 
     // helper class
@@ -108,6 +109,7 @@ public class Main extends App {
         try {
             shaders = new SelectionManager<>(new ShaderProvider());
             palettes = new SelectionManager<>(new PalettesProvider());
+            matrixGenerators = new SelectionManager<>(new MatrixGeneratorProvider());
             positionSetters = new SelectionManager<>(new PositionSetterProvider());
 
             positionSetters.setActivesByName(appSettings.positionSetter);
