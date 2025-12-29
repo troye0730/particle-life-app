@@ -28,6 +28,8 @@ import static org.lwjgl.opengl.GL30C.*;
 
 public class Main extends App {
 
+    private static final String JAVA_HOME = System.getProperty("java.home");
+    private static final String JVM_VERSION = System.getProperty("java.vm.version");
     private static String LWJGL_VERSION;
     private static String OPENGL_VENDOR;
     private static String OPENGL_RENDERER;
@@ -35,6 +37,9 @@ public class Main extends App {
     private static String GLSL_VERSION;
 
     public static void main(String[] args) {
+        System.out.println("Java Home: " + JAVA_HOME);
+        System.out.println("JVM Version: " + JVM_VERSION);
+        
         Main main = new Main();
         main.launch("Particle Life Simulator",
                 main.appSettings.startInFullscreen,
