@@ -4,6 +4,11 @@ import com.particle_life.app.selection.SelectionManager;
 import imgui.ImGui;
 import imgui.flag.ImGuiSliderFlags;
 
+import java.awt.*;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+
 public final class ImGuiUtils {
 
     /**
@@ -31,6 +36,19 @@ public final class ImGuiUtils {
             ImGui.popTextWrapPos();
             ImGui.endTooltip();
         }
+    }
+
+    public static boolean link(String label, String url) {
+        if (ImGui.button(label)) {
+            if (Desktop.isDesktopSupported()) {
+                try {
+                    Desktop.getDesktop().browse(new URI(url));
+                } catch (IOException | URISyntaxException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return false;
     }
 
     /**

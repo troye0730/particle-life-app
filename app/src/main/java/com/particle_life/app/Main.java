@@ -594,6 +594,27 @@ public class Main extends App {
             }
             ImGui.end();
         }
+
+        if (showAboutWindow.get()) {
+            ImGui.setNextWindowPos(width / 2f, height / 2f, ImGuiCond.FirstUseEver, 0.5f, 0.5f);
+            if (ImGui.begin("About", showAboutWindow, ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse)) {
+                ImGui.text("By Tom Mohr.");
+                ImGui.text("GPL-3.0 License.");
+                ImGui.dummy(0, 10);
+                if (ImGuiUtils.link("particle-life.com", "https://particle-life.com")) {
+                    setFullscreen(false);
+                }
+                ImGui.dummy(0, 10);
+                ImGui.text("Java Home: " + JAVA_HOME);
+                ImGui.text("JVM Version: " + JVM_VERSION);
+                ImGui.text("LWJGL Version: " + LWJGL_VERSION);
+                ImGui.text("OpenGL Vendor: " + OPENGL_VENDOR);
+                ImGui.text("OpenGL Renderer: " + OPENGL_RENDERER);
+                ImGui.text("OpenGL Version: " + OPENGL_VERSION);
+                ImGui.text("GLSL Version: " + GLSL_VERSION);
+            }
+            ImGui.end();
+        }
     }
 
     private void buildMainMenu() {
