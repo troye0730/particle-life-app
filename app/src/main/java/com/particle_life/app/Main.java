@@ -39,7 +39,7 @@ public class Main extends App {
     public static void main(String[] args) {
         System.out.println("Java Home: " + JAVA_HOME);
         System.out.println("JVM Version: " + JVM_VERSION);
-        
+
         Main main = new Main();
         main.launch("Particle Life Simulator",
                 main.appSettings.startInFullscreen,
@@ -572,6 +572,25 @@ public class Main extends App {
                 ImGuiUtils.helpMarker("Color of particles");
 
                 ImGui.popItemWidth();
+            }
+            ImGui.end();
+        }
+
+        if (showControlsWindow.get()) {
+            ImGui.setNextWindowPos(width / 2f, height / 2f, ImGuiCond.FirstUseEver, 0.5f, 0.5f);
+            if (ImGui.begin("Controls", showControlsWindow, ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize)) {
+                ImGui.text("""
+                        [ESCAPE]: hide / show GUI GUI
+                        [g]: show / hide graphics settings
+                        [SPACE]: pause physics
+                        [p]: set positions
+                        [c]: set colors
+                        [m]: set matrix
+                        [b]: toggle boundaries (clamped / periodic)
+                        [t]: toggle traces
+                        [F11], [f]: toggle full screen
+                        [ALT]+[F4], [q]: quit
+                        """);
             }
             ImGui.end();
         }
