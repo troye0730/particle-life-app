@@ -2,7 +2,9 @@ package com.particle_life.app;
 
 import com.particle_life.*;
 import com.particle_life.app.color.*;
+import com.particle_life.app.cursors.*;
 import com.particle_life.app.selection.SelectionManager;
+import com.particle_life.app.shaders.CursorShader;
 import com.particle_life.app.shaders.ParticleShader;
 import com.particle_life.app.shaders.ShaderProvider;
 import com.particle_life.app.utils.*;
@@ -17,6 +19,7 @@ import org.joml.Matrix4d;
 import org.joml.Vector2d;
 import org.lwjgl.Version;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -56,6 +59,9 @@ public class Main extends App {
     private SelectionManager<MatrixGenerator> matrixGenerators;
     private SelectionManager<PositionSetter> positionSetters;
     private SelectionManager<TypeSetter> typeSetters;
+    private Cursor cursor;
+    private CursorShader cursorShader;
+    private SelectionManager<CursorShape> cursorShapes;
 
     // helper class
     private final Matrix4d transform = new Matrix4d();
@@ -80,6 +86,7 @@ public class Main extends App {
     private PhysicsSettings settings;
     private int particleCount;
     private int preferredNumberOfThreads;
+    private int cursorParticleCount = 0;
 
     // particle rendering: controls
     private boolean traces = false;
@@ -116,6 +123,7 @@ public class Main extends App {
 
     // offscreen rendering buffers
     private MultisampledFramebuffer worldTexture;  // particles
+    private MultisampledFramebuffer cursorTexture;  // cursor
 
     @Override
     protected void setup() {
@@ -142,17 +150,30 @@ public class Main extends App {
         particleRenderer.init();
 
         try {
+            cursorShader = new CursorShader();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
+        cursor = new Cursor();
+        cursor.size = appSettings.cursorSize;
+
+        try {
             shaders = new SelectionManager<>(new ShaderProvider());
             palettes = new SelectionManager<>(new PalettesProvider());
             matrixGenerators = new SelectionManager<>(new MatrixGeneratorProvider());
             positionSetters = new SelectionManager<>(new PositionSetterProvider());
             typeSetters = new SelectionManager<>(new TypeSetterProvider());
+            cursorShapes = new SelectionManager<>(new CursorProvider());
 
             positionSetters.setActivesByName(appSettings.positionSetter);
         } catch (Exception e) {
             e.printStackTrace();
             return;
         }
+
+        cursor.shape = cursorShapes.getActive();  // set initial cursor shape (would be null otherwise)
 
         try {
             shaders.setActivesByName(appSettings.shader);
@@ -176,6 +197,14 @@ public class Main extends App {
         worldTexture = new MultisampledFramebuffer();
         worldTexture.init();
         glBindTexture(GL_TEXTURE_2D, worldTexture.textureSingle);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // create offscreen framebuffer for cursor rendering
+        cursorTexture = new MultisampledFramebuffer();
+        cursorTexture.init();
+        glBindTexture(GL_TEXTURE_2D, cursorTexture.textureSingle);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -284,6 +313,28 @@ public class Main extends App {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, settings.wrap ? GL_REPEAT : GL_CLAMP_TO_BORDER);
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        // render cursor onto separate framebuffer
+        cursorTexture.ensureSize(width, height, 16);
+        cursorTexture.clear(0, 0, 0, 0);
+        if (appSettings.showCursor) {
+            new NormalizedDeviceCoordinates(
+                    camPos,
+                    cam.getCamDimensions()
+            ).getMatrix(transform);
+            transform.translate(cursor.position);
+            transform.scale(cursor.size);
+
+            glViewport(0, 0, width, height);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, cursorTexture.framebufferMulti);
+
+            cursorShader.use();
+            cursorShader.setTransform(transform);
+            cursor.draw();
+        }
+        // convert multisampled texture to single-sampled texture
+        cursorTexture.toSingleSampled();
+
         // render GUI
         // Note: Any Dear ImGui code must go between ImGui.newFrame() and ImGui.render().
         imGuiGl3.newFrame();
@@ -296,6 +347,8 @@ public class Main extends App {
             ImGui.getBackgroundDrawList().addImage(worldTexture.textureSingle, 0, 0, width, height,
                     0, 0, (float) width / texWidth, (float) height / texHeight);
         }
+        ImGui.getBackgroundDrawList().addImage(cursorTexture.textureSingle, 0, 0, width, height,
+                0, 0, 1, 1);
 
         buildGui();
         ImGui.render();
@@ -310,6 +363,42 @@ public class Main extends App {
      * Render particles, cursor etc., i.e. everything except the GUI elements.
      */
     private void updateCanvas() {
+        // util object for later use
+        ScreenCoordinates screen = new ScreenCoordinates(camPos, camSize, width, height);
+
+        // set cursor position and size
+        cursor.position.set(screen.screenToWorld(new Vector2d(mouseX, mouseY)));
+
+        // count particles under cursor
+        {
+            try {
+                cursorParticleCount = cursor.countSelection(physics.particles, physics.settings.wrap);
+            } catch (NullPointerException e) {
+                e.printStackTrace();
+                /*
+                 The particle array might be null if the physics thread
+                 replaces the particle array while this executes
+                 (e.g. if the particle count is changed).
+                 I admit that this is not a clean solution, but anything else
+                 would have required too many changes to the code
+                 base, i.e. would have been overkill for this simple task.
+                 For example, the following would have been a clean solution:
+                     Do proper triple buffering of the particle array.
+                     In physics thread:
+                         1. copy Physics.particles -> physicsSnapshot1.particles
+                     In main thread (here):
+                         1. copy physicsSnapshot1.particles -> physicsSnapshot2.particles
+                         2. upload physicsSnapshot1(or 2).particles -> GPU
+                     Then, physicsSnapshot2.particles could be used here for counting the selection without risk.
+                 Another clean solution would maybe be to declare Physics.particles as volatile?
+                 Currently, another safe way would be to use the following:
+                     loop.enqueue(() -> cursorParticleCount = cursor.countSelection(physics));
+                 But this would make the particle count laggy if the physics simulation is slow,
+                 and I find it a better user experience to have the particle count ALWAYS update in real time.
+                */
+            }
+        }
+
         if (newSnapshotAvailable.get()) {
 
             // get local copy of snapshot
@@ -548,6 +637,50 @@ public class Main extends App {
                 }
                 ImGuiUtils.helpMarker("The number of threads used by your processor for the physics computation." +
                         "\n(If you don't know what this means, just ignore it.)");
+
+                ImGui.popItemWidth();
+            }
+            ImGui.end();
+
+            // CURSOR
+            ImGui.setNextWindowSize(290, 250, ImGuiCond.FirstUseEver);
+            ImGui.setNextWindowPos(0, height, ImGuiCond.Always, 0.0f, 1.0f);
+            ImGui.getStyle().setWindowMenuButtonPosition(ImGuiDir.Left);
+            if (ImGui.begin("Cursor",
+                    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoMove)) {
+                ImGui.pushItemWidth(200);
+
+                ImGui.text("Hovered Particles: " + cursorParticleCount);
+                if (ImGui.checkbox("Show", appSettings.showCursor)) {
+                    appSettings.showCursor ^= true;
+                }
+                // cursor size slider
+                ImGuiUtils.numberInput("Size",
+                        0.001f, 1f,
+                        (float) cursor.size,
+                        "%.3f",
+                        value -> cursor.size = value);
+                ImGuiUtils.helpMarker("[ctrl+scroll]");
+
+                ImGuiUtils.renderCombo("Shape##cursor", cursorShapes);
+                cursor.shape = cursorShapes.getActive();
+
+                ImGuiUtils.separator();
+
+                if (ImGui.beginTable("Cursor Action Table", 2, ImGuiTableFlags.None)) {
+                    // Set up column headers
+                    ImGui.tableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 100);
+                    ImGui.tableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 100);
+
+                    ImGui.tableNextRow();
+                    ImGui.tableSetColumnIndex(0);
+                    ImGui.text("Left");
+                    ImGui.tableSetColumnIndex(1);
+                    ImGui.text("Right");
+
+                    ImGui.tableNextRow();
+                    ImGui.endTable();
+                }
 
                 ImGui.popItemWidth();
             }

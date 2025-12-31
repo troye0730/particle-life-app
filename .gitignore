@@ -25,3 +25,6 @@ build
 
 # Ignore VSCode settings folder
 .vscode/
+
+# Ignore DS_Store in MacOS
+.DS_Store

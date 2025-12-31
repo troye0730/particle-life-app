@@ -14,6 +14,10 @@ public abstract class App {
     protected long window;
     protected int width;
     protected int height;
+    protected double mouseX = -1;
+    protected double mouseY = -1;
+    protected double pmouseX = mouseX;// previous mouse position
+    protected double pmouseY = mouseY;
 
     // global scaling of GUI -> apply this to window sizes etc.
     protected float scale = 1.0f;
@@ -46,6 +50,9 @@ public abstract class App {
 
         while (!glfwWindowShouldClose(window)) {
             guiClock.tick();
+
+            pmouseX = mouseX;
+            pmouseY = mouseY;
 
             glfwPollEvents();
             imGuiLayer.processEvents();
@@ -165,6 +172,10 @@ public abstract class App {
                     }
                 }
             }
+        });
+        imGuiLayer.cursorPosCallbacks.add((window1, xpos, ypos) -> {
+            mouseX = xpos;
+            mouseY = ypos;
         });
         imGuiLayer.mouseButtonCallbacks.add((window1, button, action, mods) -> {
             switch (action) {

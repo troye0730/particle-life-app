@@ -15,6 +15,7 @@ public class ImGuiLayer {
     public List<GLFWMouseButtonCallbackI> mouseButtonCallbacks = new ArrayList<>();
     public List<GLFWCharCallbackI> charCallbacks = new ArrayList<>();
     public List<GLFWScrollCallbackI> scrollCallbacks = new ArrayList<>();
+    public List<GLFWCursorPosCallbackI> cursorPosCallbacks = new ArrayList<>();
     public List<GLFWKeyCallbackI> keyCallbacks = new ArrayList<>();
     private ImGuiIO io;
 
@@ -105,6 +106,13 @@ public class ImGuiLayer {
             // dispatch to application
             if (!io.getWantCaptureMouse()) {
                 scrollCallbacks.forEach(callback -> callback.invoke(w, xOffset, yOffset));
+            }
+        });
+
+        glfwSetCursorPosCallback(glfwWindow, (window, xpos, ypos) -> {
+            // dispatch to application
+            if (!io.getWantCaptureMouse()) {
+                cursorPosCallbacks.forEach(callback -> callback.invoke(window, xpos, ypos));
             }
         });
 
