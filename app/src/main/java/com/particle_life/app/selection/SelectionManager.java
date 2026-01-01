@@ -55,7 +55,7 @@ public class SelectionManager<T> {
         }
     }
 
-    public void setActivesByName(String name) {
+    public void setActiveByName(String name) {
         int i = getIndexByName(name);
         if (i == -1) {
             throw new IllegalArgumentException("No item with name '%s' found in selection.".formatted(name));

@@ -17,6 +17,7 @@ import imgui.type.ImInt;
 
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
+import org.joml.Vector3d;
 import org.lwjgl.Version;
 
 import java.io.IOException;
@@ -62,8 +63,10 @@ public class Main extends App {
     private Cursor cursor;
     private CursorShader cursorShader;
     private SelectionManager<CursorShape> cursorShapes;
+    private SelectionManager<CursorAction> cursorActions1;
+    private SelectionManager<CursorAction> cursorActions2;
 
-    // helper class
+    // helper classes
     private final Matrix4d transform = new Matrix4d();
     private final ParticleRenderer particleRenderer = new ParticleRenderer();
     private final ImGuiImplGl3 imGuiGl3 = new ImGuiImplGl3();
@@ -166,8 +169,12 @@ public class Main extends App {
             positionSetters = new SelectionManager<>(new PositionSetterProvider());
             typeSetters = new SelectionManager<>(new TypeSetterProvider());
             cursorShapes = new SelectionManager<>(new CursorProvider());
+            cursorActions1 = new SelectionManager<>(new CursorActionProvider());
+            cursorActions2 = new SelectionManager<>(new CursorActionProvider());
 
-            positionSetters.setActivesByName(appSettings.positionSetter);
+            positionSetters.setActiveByName(appSettings.positionSetter);
+            cursorActions1.setActiveByName(appSettings.cursorActionLeft);
+            cursorActions2.setActiveByName(appSettings.cursorActionRight);
         } catch (Exception e) {
             e.printStackTrace();
             return;
@@ -176,7 +183,7 @@ public class Main extends App {
         cursor.shape = cursorShapes.getActive();  // set initial cursor shape (would be null otherwise)
 
         try {
-            shaders.setActivesByName(appSettings.shader);
+            shaders.setActiveByName(appSettings.shader);
         } catch (IllegalArgumentException e) {
             // todo: emit warning
             shaders.setActive(0);
@@ -399,6 +406,67 @@ public class Main extends App {
             }
         }
 
+        // cursor actions
+        if (leftDraggingParticles || rightDraggingParticles) {
+
+            // need to copy for async access in loop.enqueue()
+            final Cursor cursorCopy;
+            try {
+                cursorCopy = cursor.copy();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            // execute cursor action
+            SelectionManager<CursorAction> cursorActions = leftDraggingParticles ? cursorActions1 : cursorActions2;
+            switch (cursorActions.getActive()) {
+                case MOVE -> {
+                    final Vector3d dragStartWorld = screen.screenToWorld(pmouseX, pmouseY);  // where the dragging started
+                    final Vector3d dragStopWorld = screen.screenToWorld(mouseX, mouseY);  // where the dragging ended
+                    final Vector3d delta = dragStopWorld.sub(dragStartWorld);  // dragged distance
+                    cursorCopy.position.set(dragStartWorld.x, dragStartWorld.y, 0.0);  // set cursor copy to start of dragging
+                    loop.enqueue(() -> {
+                        for (Particle p : cursorCopy.getSelection(physics.particles, physics.settings.wrap)) {
+                            p.position.add(delta.x, delta.y, 0);
+                            physics.ensurePosition(p.position);  // wrap or clamp
+                        }
+                    });
+                }
+                case BRUSH -> {
+                    final int addCount = appSettings.brushPower;
+                    loop.enqueue(() -> {
+                        int prevLength = physics.particles.length;
+                        physics.particles = Arrays.copyOf(physics.particles, prevLength + addCount);
+                        for (int i = 0; i < addCount; i++) {
+                            Particle particle = new Particle();
+                            particle.position.set(cursorCopy.sampleRandomPoint());
+                            physics.ensurePosition(particle.position);
+                            particle.type = physics.typeSetter.getType(
+                                    particle.position,
+                                    particle.velocity,
+                                    particle.type,
+                                    physics.settings.matrix.size()
+                            );
+                            physics.particles[prevLength + i] = particle;
+                        }
+                    });
+                }
+                case DELETE -> {
+                    loop.enqueue(() -> {
+                        Particle[] newParticles = new Particle[physics.particles.length];
+                        int j = 0;
+                        for (Particle particle : physics.particles) {
+                            if (!cursorCopy.isInside(particle, physics.settings.wrap)) {
+                                newParticles[j] = particle;
+                                j++;
+                            }
+                        }
+                        physics.particles = Arrays.copyOf(newParticles, j);  // cut to correct length
+                    });
+                }
+            }
+        }
+
         if (newSnapshotAvailable.get()) {
 
             // get local copy of snapshot
@@ -423,7 +491,7 @@ public class Main extends App {
         if (showGui.get()) {
             // MAIN MENU
             ImGui.setNextWindowSize(-1, -1, ImGuiCond.FirstUseEver);
-            ImGui.setNextWindowPos(0, 0, ImGuiCond.Always);
+            ImGui.setNextWindowPos(0, 0, ImGuiCond.Always, 0.0f, 0.0f);
             ImGui.pushStyleVar(ImGuiStyleVar.WindowRounding, 0);
             ImGui.pushStyleVar(ImGuiStyleVar.WindowPadding, 4f, 0f);
             ImGui.pushStyleVar(ImGuiStyleVar.WindowMinSize, 0f, 0f);
@@ -572,12 +640,12 @@ public class Main extends App {
                     ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoMove)) {
                 ImGui.pushItemWidth(200);
 
-                if (ImGui.button(loop.pause ? "Play" : "Pause")) {
+                if (ImGui.button(loop.pause ? "Play" : "Pause", 80, 0)) {
                     loop.pause ^= true;
                 }
                 ImGuiUtils.helpMarker("[SPACE] " +
                         "The physics simulation runs independently from the graphics in the background.");
-                
+
                 ImGui.sameLine();
                 if (loop.getAvgFramerate() < 100000) {
                     ImGui.text(String.format("FPS: %5.0f", loop.getAvgFramerate()));
@@ -679,8 +747,30 @@ public class Main extends App {
                     ImGui.text("Right");
 
                     ImGui.tableNextRow();
+                    ImGui.tableSetColumnIndex(0);
+                    ImGui.pushItemWidth(100);
+                    ImGuiUtils.renderCombo("##cursoraction1", cursorActions1);
+                    ImGui.popItemWidth();
+                    ImGui.tableSetColumnIndex(1);
+                    ImGui.pushItemWidth(100);
+                    ImGuiUtils.renderCombo("##cursoraction2", cursorActions2);
+                    ImGui.popItemWidth();
+
+                    ImGui.tableNextRow();
                     ImGui.endTable();
                 }
+
+                ImGui.indent();
+                if (cursorActions1.getActive() == CursorAction.BRUSH || cursorActions2.getActive() == CursorAction.BRUSH) {
+                    ImInt inputValue = new ImInt(appSettings.brushPower);
+                    ImGui.pushItemWidth(100);
+                    if (ImGui.inputInt("Brush Power", inputValue, 10, ImGuiInputTextFlags.EnterReturnsTrue)) {
+                        appSettings.brushPower = Math.max(0, inputValue.get());
+                    }
+                    ImGui.popItemWidth();
+                    ImGuiUtils.helpMarker("Number of particles added per frame.");
+                }
+                ImGui.unindent();
 
                 ImGui.popItemWidth();
             }

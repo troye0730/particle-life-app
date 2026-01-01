@@ -1,8 +1,11 @@
 package com.particle_life.app.cursors;
 
+import com.particle_life.Particle;
 import org.joml.Vector3d;
 
-import com.particle_life.Particle;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Cursor {
 
@@ -31,6 +34,14 @@ public class Cursor {
         return shape.isInside(deltaNormalized);
     }
 
+    public List<Particle> getSelection(Particle[] particles, boolean wrap) {
+        List<Particle> selectedParticles = new ArrayList<>();
+        for (Particle particle : particles) {
+            if (isInside(particle, wrap)) selectedParticles.add(particle);
+        }
+        return selectedParticles;
+    }
+
     public int countSelection(Particle[] particles, boolean wrap) {
         int count = 0;
         for (Particle particle : particles) {
@@ -42,5 +53,17 @@ public class Cursor {
     public void draw() {
         if (!shape.isInitialized()) shape.initialize();  // lazy initialize shapes (register VBOs etc. for drawing)
         shape.draw();
+    }
+
+    public Vector3d sampleRandomPoint() {
+        return shape.sampleRandomPoint().mul(size).add(position);
+    }
+
+    public Cursor copy() throws IOException {
+        Cursor c = new Cursor();
+        c.position.set(position);
+        c.size = size;
+        c.shape = shape.copy();
+        return c;
     }
 }
