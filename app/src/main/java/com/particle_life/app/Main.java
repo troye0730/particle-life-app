@@ -3,6 +3,9 @@ package com.particle_life.app;
 import com.particle_life.*;
 import com.particle_life.app.color.*;
 import com.particle_life.app.cursors.*;
+import com.particle_life.app.io.MatrixIO;
+import com.particle_life.app.io.ParticlesIO;
+import com.particle_life.app.io.ResourceAccess;
 import com.particle_life.app.selection.SelectionManager;
 import com.particle_life.app.shaders.CursorShader;
 import com.particle_life.app.shaders.ParticleShader;
@@ -14,18 +17,31 @@ import imgui.gl3.ImGuiImplGl3;
 import imgui.type.ImBoolean;
 import imgui.type.ImFloat;
 import imgui.type.ImInt;
-
+import imgui.type.ImString;
 import org.joml.Matrix4d;
 import org.joml.Vector2d;
 import org.joml.Vector3d;
 import org.lwjgl.Version;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL12C.GL_BGRA;
 import static org.lwjgl.opengl.GL13C.GL_CLAMP_TO_BORDER;
 import static org.lwjgl.opengl.GL13C.GL_MULTISAMPLE;
 import static org.lwjgl.opengl.GL20C.GL_SHADING_LANGUAGE_VERSION;
@@ -46,6 +62,11 @@ public class Main extends App {
         System.out.println("JVM Version: " + JVM_VERSION);
 
         Main main = new Main();
+        try {
+            main.appSettings.load(SETTINGS_FILE_NAME);
+        } catch (IOException e) {
+            main.error = new AppSettingsLoadException("Failed to load settings", e);
+        }
         main.launch("Particle Life Simulator",
                 main.appSettings.startInFullscreen,
                 // request OpenGL version 4.1 (corresponds to "#version 410" in shaders)
@@ -54,6 +75,7 @@ public class Main extends App {
     }
 
     private final AppSettings appSettings = new AppSettings();
+    private static final String SETTINGS_FILE_NAME = "settings.toml";
 
     /* If this value is set, an error popup is displayed,
      * waiting for the user to close the app. */
@@ -132,6 +154,15 @@ public class Main extends App {
     private final ImBoolean showControlsWindow = new ImBoolean(false);
     private final ImBoolean showAboutWindow = new ImBoolean(false);
     private final ImBoolean showSavesPopup = new ImBoolean(false);
+
+    // GUI: widget state variables
+    private final ImString saveName = new ImString();
+    private ImGuiCardView.Card[] saveCards = new ImGuiCardView.Card[0];
+    private final AtomicBoolean requestedSaveCardsLoading = new AtomicBoolean(true);
+    private int[] saveImage = null;
+    private static final int SAVE_IMAGE_SIZE = 256;
+    private boolean requestedSaveImage = false;
+    private File selectedSaveFile = null;
 
     // offscreen rendering buffers
     private MultisampledFramebuffer worldTexture;  // particles
@@ -250,6 +281,38 @@ public class Main extends App {
 
     @Override
     protected void beforeClose() {
+
+        // try to save app settings
+        if (this.error == null || !(this.error instanceof AppSettingsLoadException)) {
+            // Don't save settings if the app settings could not
+            // be loaded properly (which is where an
+            // AppSettingsException would be thrown).
+            // Why? Because in this case, the settings would be
+            // just the defaults and the user would lose their
+            // actual settings, as they would be overwritten.
+
+            // Here, we also need to save all the app settings
+            // that are stored outside the app settings object
+            // during runtime.
+            appSettings.palette = palettes.getActiveName();
+            appSettings.shader = shaders.getActiveName();
+            appSettings.cursorSize = cursor.size;
+            appSettings.cursorActionLeft = cursorActions1.getActiveName();
+            appSettings.cursorActionRight = cursorActions2.getActiveName();
+            appSettings.positionSetter = positionSetters.getActiveName();
+            // Note: Why are we not storing the fullscreen state here?
+            // I.e. why not appSettings.startInFullscreen = isFullscreen()?
+            // Because here, the glfw window is already closed,
+            // and we can't access the fullscreen state anymore.
+            // (That's why we override App.setFullscreen().)
+
+            try {
+                appSettings.save(SETTINGS_FILE_NAME);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         if (!loop.stop(1000)) {
             loop.kill();
             physics.kill();
@@ -945,6 +1008,127 @@ public class Main extends App {
             }
             ImGui.end();
         }
+
+        if (showSavesPopup.get()) ImGui.openPopup("Saves");
+        ImGui.setNextWindowSize(480, -1, ImGuiCond.Always);
+        ImGui.setNextWindowPos(width / 2f, height / 2f, ImGuiCond.Appearing, 0.5f, 0.5f);
+        ImGui.setNextWindowBgAlpha(1f);
+        if (ImGui.beginPopupModal("Saves", showSavesPopup, ImGuiWindowFlags.NoResize)) {
+
+            ImGui.textDisabled("""
+                    Left-click to load, middle-click to delete.
+                    The most recent saves are at the top.
+                    Each save corresponds to a .zip file in the 'saves' directory.
+                    """
+            );
+            ImGuiUtils.separator();
+
+            float cardViewWidth = ImGui.getWindowContentRegionMaxX() - 2 * ImGui.getStyle().getFramePaddingX();
+            ImGui.beginChild("save cards", cardViewWidth, 250);
+            ImGuiCardView.Card[] filteredCards = Arrays
+                    .stream(saveCards)
+                    .filter(card -> card.name.contains(saveName.get()))
+                    .sorted(Comparator.comparing(card -> -card.file.lastModified()))  // sort by creation time (descending)
+                    .toArray(ImGuiCardView.Card[]::new);
+            ImGuiCardView.draw(
+                    cardViewWidth,
+                    100,
+                    8,
+                    filteredCards,
+                    card -> {
+                        loop.enqueue(() -> loadState(card.file));
+                        showSavesPopup.set(false);
+                    },
+                    card -> {
+                        try {
+                            Files.deleteIfExists(card.file.toPath());
+                        } catch (IOException e) {
+                            this.error = e;
+                        }
+                        requestedSaveCardsLoading.set(true);
+                    }
+            );
+            ImGui.endChild();
+
+            if (!ImGui.isAnyItemActive() && !ImGui.isMouseClicked(0)) {
+                // see https://github.com/ocornut/imgui/issues/455#issuecomment-167440172
+                ImGui.setKeyboardFocusHere(0);
+            }
+            boolean shouldSave = ImGui.inputTextWithHint("##save name", "Save Name", saveName, ImGuiInputTextFlags.EnterReturnsTrue);
+            ImGuiUtils.helpMarker("Enter a name and press Enter to save the current state.");
+            if (shouldSave) {
+                String title = saveName.get();
+                saveName.clear();
+                if (!title.isBlank()) {
+                    selectedSaveFile = new File("saves/" + title + ".zip");
+                    requestedSaveImage = true;
+                }
+            }
+            ImGui.endPopup();
+        }
+
+        if (requestedSaveImage) {
+
+            saveImage = renderParticlesToImage();
+
+            final File selectedFile = selectedSaveFile;
+            loop.enqueue(() -> {
+                selectedFile.getParentFile().mkdirs();
+                saveState(selectedFile);
+            });
+
+            requestedSaveImage = false;
+        }
+
+        if (requestedSaveCardsLoading.getAndSet(false)) {
+            loadSaveCards();
+        }
+    }
+
+    private int[] renderParticlesToImage() {
+
+        // get shader
+        ParticleShader particleShader;
+        String defaultShaderName = "default";
+        if (shaders.hasName(defaultShaderName)) {
+            particleShader = shaders.get(shaders.getIndexByName(defaultShaderName)).object;
+        } else {
+            particleShader = shaders.getActive();
+        }
+
+        glEnable(GL_BLEND);
+        particleShader.blendMode.glBlendFunc();
+
+        // set shader variables
+        particleShader.use();
+        particleShader.setPalette(getColorsFromPalette(
+                settings.matrix.size(),
+                new NaturalRainbowPalette()));
+        particleShader.setTransform(new NormalizedDeviceCoordinates(
+                new Vector2d(0.5, 0.5),  // center camera
+                new Vector2d(1, 1)  // capture whole world
+        ).getMatrix());
+        particleShader.setSize(0.015f);
+        particleShader.setCamTopLeft(0, 0);
+        particleShader.setWrap(false);
+
+        int[] pixels = new int[SAVE_IMAGE_SIZE * SAVE_IMAGE_SIZE];
+        MultisampledFramebuffer tex = new MultisampledFramebuffer();
+        tex.init();
+        tex.ensureSize(SAVE_IMAGE_SIZE, SAVE_IMAGE_SIZE, 16);
+        tex.clear(0, 0, 0, 0);
+        glViewport(0, 0, SAVE_IMAGE_SIZE, SAVE_IMAGE_SIZE);
+        glBindFramebuffer(GL_FRAMEBUFFER, tex.framebufferMulti);
+        particleRenderer.drawParticles();
+        tex.toSingleSampled();
+        glBindFramebuffer(GL_FRAMEBUFFER, tex.framebufferSingle);
+        glReadPixels(0, 0, SAVE_IMAGE_SIZE, SAVE_IMAGE_SIZE, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
+
+        // unbind, delete
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        tex.delete();
+
+        return pixels;
     }
 
     private void buildMainMenu() {
@@ -952,6 +1136,7 @@ public class Main extends App {
 
             if (ImGui.menuItem("Saves##menu", "Ctrl+s")) {
                 showSavesPopup.set(true);
+                requestedSaveCardsLoading.set(true);
             }
 
             if (ImGui.menuItem("Controls..")) {
@@ -1003,6 +1188,109 @@ public class Main extends App {
         }
     }
 
+    private void loadSaveCards() {
+        List<Path> saves;
+        try {
+            saves = ResourceAccess.listFiles("saves");
+        } catch (IOException e) {
+            this.error = e;
+            return;
+        }
+        saveCards = ImGuiCardView.loadCards(saves);
+    }
+
+    private void saveState(File file) {
+        try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+            try (ZipOutputStream zip = new ZipOutputStream(fileOutputStream)) {
+
+                // PARTICLES
+                zip.putNextEntry(new ZipEntry("particles.tsv"));
+                ParticlesIO.saveParticles(physics.particles, zip);
+                zip.closeEntry();
+
+                // PHYSICS SETTINGS
+                zip.putNextEntry(new ZipEntry("physics.toml"));
+                PhysicsSettingsToml.fromPhysicsSettings(physics.settings).save(zip);
+                zip.closeEntry();
+
+                // MATRIX
+                zip.putNextEntry(new ZipEntry("matrix.tsv"));
+                MatrixIO.saveMatrix(physics.settings.matrix, zip);
+                zip.closeEntry();
+
+                // IMAGE
+                if (saveImage != null) {
+                    zip.putNextEntry(new ZipEntry("img.png"));
+                    // convert to png format
+                    BufferedImage bufferedImage = new BufferedImage(
+                            SAVE_IMAGE_SIZE, SAVE_IMAGE_SIZE,
+                            BufferedImage.TYPE_INT_ARGB
+                    );
+                    bufferedImage.setRGB(
+                            0, 0, SAVE_IMAGE_SIZE, SAVE_IMAGE_SIZE,
+                            saveImage, 0, SAVE_IMAGE_SIZE
+                    );
+                    ImageIO.write(bufferedImage, "png", zip);
+                    zip.closeEntry();
+                    saveImage = null;
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        requestedSaveCardsLoading.set(true);
+    }
+
+    /**
+     * Load the state from a ZIP file.
+     * The zip file can contain the following files:
+     * <ul>
+     *     <li>particles.tsv</li>
+     *     <li>physics.toml</li>
+     *     <li>matrix.tsv</li>
+     * </ul>
+     * If a file is missing, the existing state will be kept for that part.
+     * Currently, this might lead to an error, e.g. if the matrix size
+     * doesn't match the particle types.
+     *
+     * @param file a zip file
+     */
+    private void loadState(File file) {
+        try (ZipInputStream zip = new ZipInputStream(new FileInputStream(file))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                switch (entry.getName()) {
+                    case "particles.tsv": {
+                        physics.particles = ParticlesIO.loadParticles(zip);
+                        break;
+                    }
+                    case "physics.toml": {
+                        PhysicsSettingsToml toml = new PhysicsSettingsToml();
+                        toml.load(zip);
+                        toml.toPhysicsSettings(physics.settings);  // copy values
+                        break;
+                    }
+                    case "matrix.tsv": {
+                        physics.settings.matrix = MatrixIO.loadMatrix(zip);
+                        physics.ensureTypes();  // in case the matrix size changed
+                        break;
+                    }
+                    case "img.png": {
+                        // ignore
+                        break;
+                    }
+                    default: {
+                        System.err.println("Unknown file in ZIP: " + entry.getName());
+                        break;
+                    }
+                }
+                zip.closeEntry();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void resetCamera(boolean fit) {
         if (settings.wrap) camPos.sub(Math.floor(camPos.x), Math.floor(camPos.y));  // remove periodic offset
         camPosGoal.set(0.5, 0.5);  // world center
@@ -1047,6 +1335,7 @@ public class Main extends App {
             switch (keyName) {
                 case "s" -> {
                     showSavesPopup.set(true);
+                    requestedSaveCardsLoading.set(true);
 
                     // Clear key states manually, because releasing [ctrl]+[s]
                     // won't be captured once the popup is open.

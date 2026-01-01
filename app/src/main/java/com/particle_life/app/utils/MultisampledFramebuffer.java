@@ -73,4 +73,12 @@ public class MultisampledFramebuffer {
             this.samples = boundedSamples;
         }
     }
+
+    public void delete() {
+        glDeleteFramebuffers(framebufferMulti);
+        glDeleteTextures(textureMulti);
+
+        glDeleteFramebuffers(framebufferSingle);
+        glDeleteTextures(textureSingle);
+    }
 }
