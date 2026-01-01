@@ -1,6 +1,8 @@
 package com.particle_life.app;
 
 import imgui.*;
+import imgui.callback.ImStrConsumer;
+import imgui.callback.ImStrSupplier;
 import imgui.flag.*;
 import org.lwjgl.glfw.*;
 
@@ -134,6 +136,25 @@ public class ImGuiLayer {
             // dispatch to application
             if (!io.getWantCaptureMouse()) {
                 cursorPosCallbacks.forEach(callback -> callback.invoke(window, xpos, ypos));
+            }
+        });
+
+        io.setSetClipboardTextFn(new ImStrConsumer() {
+            @Override
+            public void accept(final String s) {
+                glfwSetClipboardString(glfwWindow, s);
+            }
+        });
+
+        io.setGetClipboardTextFn(new ImStrSupplier() {
+            @Override
+            public String get() {
+                final String clipboardString = glfwGetClipboardString(glfwWindow);
+                if (clipboardString != null) {
+                    return clipboardString;
+                } else {
+                    return "";
+                }
             }
         });
 
