@@ -587,6 +587,17 @@ public class Main extends App {
             physicsSnapshot.take(physics, physicsSnapshotLoadDistributor);
             newSnapshotAvailable.set(true);
         });
+
+        if (mouseX == 0 && mouseY == 0 && !showGui.get()) {
+            showGui.set(true);
+            traces = false;
+
+            // this is a bugfix:
+            // for some reason, ImGui behaves differently if the mouse
+            // is still at the same position when it's displayed again.
+            mouseX += 1;
+            mouseY += 1;
+        }
     }
 
     private void buildErrorGui() {
