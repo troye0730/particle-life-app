@@ -29,7 +29,7 @@ public class ImGuiLayer {
     private final boolean[] mouseDown = new boolean[5];
     private final boolean[] pmouseDown = new boolean[5];// previous state
 
-    private final int[] keyMap = new int[ImGuiKey.COUNT];
+    private final int[] keyMap = new int[GLFW_KEY_LAST + 1];
 
     public ImGuiLayer(long glfwWindow) {
         this.glfwWindow = glfwWindow;
@@ -94,6 +94,7 @@ public class ImGuiLayer {
         glfwSetInputMode(glfwWindow, GLFW_STICKY_KEYS, GLFW_TRUE);
 
         glfwSetKeyCallback(glfwWindow, (w, key, scancode, action, mods) -> {
+            if (key == GLFW_KEY_UNKNOWN) return;
             boolean isDown = action == GLFW_PRESS;
             int imGuiKey = keyMap[key];
             if (imGuiKey != ImGuiKey.None) {
